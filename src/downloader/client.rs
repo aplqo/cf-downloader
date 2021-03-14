@@ -1,6 +1,7 @@
 extern crate regex;
 extern crate reqwest;
 
+use crate::types::Error;
 use futures::executor::block_on;
 use regex::Regex;
 use reqwest::{Client, Proxy};
@@ -13,13 +14,13 @@ pub enum ProblemType {
     Gym,
 }
 pub struct Problem {
-    source: ProblemType,
-    contest: String,
+    pub source: ProblemType,
+    pub contest: String,
     id: String,
 }
 pub struct Submission {
-    output: String,
-    answer: Option<String>,
+    pub output: String,
+    pub answer: Option<String>,
 }
 struct UtilityRegex {
     csrf: Regex,
@@ -31,9 +32,6 @@ pub struct Session {
     handle: String,
     ftaa: String,
     regex: UtilityRegex,
-}
-pub struct Error {
-    description: String,
 }
 
 impl std::convert::From<reqwest::Error> for Error {
@@ -118,7 +116,7 @@ impl Session {
     pub async fn get_last_submission_url(&self, problem: &Problem) -> Result<String, Error> {
         Ok(String::new())
     }
-    pub async fn get_submission(&self, url: &String) -> Result<Submission, Error> {
+    pub async fn wait_submission(&self, url: &String) -> Result<Submission, Error> {
         Err(Error {
             description: String::new(),
         })
