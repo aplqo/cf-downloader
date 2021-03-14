@@ -7,13 +7,15 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "cf-downloader"
+name = "cf_downloader"
 path = "./src/downloader/lib.rs"
 
 [[bin]]
-name "cf-downloader"
+name = "cf-downloader"
 
 [dependencies]
 reqwest = { version = "0.11", features = ["json", "cookies"] }
 regex = "1.4.4"
 futures = "0.3.13"
+serde = "1.0"
+serde_yaml = "0.8"
