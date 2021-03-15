@@ -12,7 +12,7 @@ use serde::Serialize;
 struct MetaParam<'a> {
     ignore: Vec<&'a DataId>,
 }
-struct Meta<'a> {
+pub struct Meta<'a> {
     result: String,
     param: MetaParam<'a>,
     engine: Handlebars<'a>,
@@ -27,7 +27,7 @@ impl<'a> traits::MetaEncoding<'a> for Meta<'a> {
         };
         ret.param.ignore.reserve(max);
         ret.engine
-            .register_template_string("code", template.content)?;
+            .register_template_string("code", template.content.as_str())?;
         Ok(ret)
     }
     fn ignore(&mut self, hash: &'a DataId) {

@@ -33,7 +33,7 @@ impl<'a> traits::DataEncoder<'a> for Encoder<'a> {
         };
         ret.param.ignore.reserve(max);
         ret.engine
-            .register_template_string("code", template.content)?;
+            .register_template_string("code", template.content.as_str())?;
         Ok(ret)
     }
     fn push_ignore(&mut self, hash: &'a DataId) {

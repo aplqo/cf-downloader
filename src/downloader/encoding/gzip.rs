@@ -8,7 +8,7 @@ use crate::{
 use flate2::Decompress;
 use std::vec::Vec;
 
-struct Decoder {
+pub struct Decoder {
     buffer: Vec<u8>,
     decoded: Vec<u8>,
     decompress: Decompress,
