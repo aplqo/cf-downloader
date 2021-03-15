@@ -1,23 +1,27 @@
-use crate::client::Submission;
-use crate::types::{Error, Template, TestMeta};
+use crate::{
+    client::Verdict,
+    encoding::Template,
+    types::{DataId, Result, TestMeta},
+};
 
-pub trait MetaEncoding {
-    fn new(template: &Template, max_ignore: usize) -> Self;
-    fn ignore_input(&mut self, hash: &String);
-    fn generate_encoder(&self) -> &String;
-    fn decode(message: Submission) -> Result<TestMeta, Error>;
+pub trait MetaEncoding<'a>: Sized {
+    fn new(template: &Template, max_ignore: usize) -> Result<Self>;
+    fn ignore(&mut self, hash: &'a DataId);
+    fn generate(&mut self) -> Result<&String>;
+    fn decode(message: Verdict) -> Result<TestMeta>;
 }
 
-pub trait DataEncoder {
-    fn new(template: &Template, data: &[TestMeta]) -> Self;
-    fn ignore_input(&mut self, pos: usize);
-    fn enable_input(&mut self, pos: usize);
-    fn generate_enoder(&self) -> &String;
+pub trait DataEncoder<'a>: Sized {
+    fn new(template: &Template, max_ignore: usize) -> Result<Self>;
+    fn push_ignore(&mut self, hash: &'a DataId);
+    fn pop_ignore(&mut self);
+    fn generate(&mut self, offset: usize) -> Result<&String>;
 }
 
-pub trait DataDecoder {
-    fn new(test: &TestMeta) -> Self;
-    fn add_message(&mut self, offset: i32, message: &String);
+pub trait DataDecoder: Sized {
+    fn new() -> Self;
+    fn init(&mut self, test: &TestMeta);
+    fn add_message(&mut self, offset: usize, message: &str);
     fn clear(&mut self);
-    fn decode(&mut self) -> Result<String, Error>;
+    fn decode(&mut self) -> Result<String>;
 }
