@@ -24,23 +24,7 @@ pub struct Verdict {
     pub answer: Option<String>,
 }
 
-struct UtilityRegex {
-    csrf: Regex,
-    login: Regex,
-    submit: Regex,
-    last_submit: Regex,
-}
-impl UtilityRegex {
-    fn new() -> Self {
-        UtilityRegex {
-            csrf: Regex::new("csrf='(.+?)'").unwrap(),
-            login: Regex::new(r#"handle = "([\s\S]+?)"#).unwrap(),
-            submit: Regex::new(r#"error[a-zA-Z_\-\ ]*">(.*?)</span>"#).unwrap(),
-            last_submit: Regex::new(r#"<tr class="last-row" data-submission-id="([[:digit:]]+)""#)
-                .unwrap(),
-        }
-    }
-}
+impl Problem {}
 
 pub struct Submission {
     id: String,
@@ -81,7 +65,23 @@ impl Submission {
         })
     }
 }
-
+struct UtilityRegex {
+    csrf: Regex,
+    login: Regex,
+    submit: Regex,
+    last_submit: Regex,
+}
+impl UtilityRegex {
+    fn new() -> Self {
+        UtilityRegex {
+            csrf: Regex::new("csrf='(.+?)'").unwrap(),
+            login: Regex::new(r#"handle = "([\s\S]+?)"#).unwrap(),
+            submit: Regex::new(r#"error[a-zA-Z_\-\ ]*">(.*?)</span>"#).unwrap(),
+            last_submit: Regex::new(r#"<tr class="last-row" data-submission-id="([[:digit:]]+)""#)
+                .unwrap(),
+        }
+    }
+}
 pub struct Session {
     client: Client,
     handle: String,
@@ -201,6 +201,19 @@ impl Session {
             Some(err) => Err(Error::new(err.get(1).unwrap().as_str().to_string())),
             None => Ok(()),
         }
+    }
+    pub async fn check_exist(&self, problem: &Problem) -> Result<bool> {
+        Ok(self
+            .client
+            .get(format!(
+                "https://codeforces.com/contest/{}/problem/{}",
+                problem.contest, problem.id
+            ))
+            .send()
+            .await?
+            .url()
+            .as_str()
+            != "https://codeforces.com")
     }
 
     pub fn logout(&self) -> Result<()> {

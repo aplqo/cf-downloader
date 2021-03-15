@@ -1,4 +1,4 @@
-mod client;
+pub mod client;
 pub mod downloader;
-mod encoding;
+pub mod encoding;
 pub mod types;
