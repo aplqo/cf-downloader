@@ -1,19 +1,23 @@
 extern crate regex;
 extern crate reqwest;
+extern crate serde;
 
 use crate::types::{Error, Result};
 use regex::Regex;
 use reqwest::{Client, Proxy};
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, result::Result as StdResult};
 
 const MAX_OUTPUT: usize = 500;
 const BFAA: &str = "f1b3f18c715565b589b7823cda7448ce";
 const FIREFOX_UA: &str = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0";
 
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum ProblemType {
     Contest,
     Gym,
 }
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Problem {
     pub source: ProblemType,
     pub contest: String,
@@ -24,8 +28,6 @@ pub struct Verdict {
     pub(crate) output: String,
     pub(crate) answer: Option<String>,
 }
-
-impl Problem {}
 
 pub struct Submission {
     id: String,

@@ -139,8 +139,8 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
     let problem = read_problem(stdout, session, rt);
     write_ok!(stdout, "Selected problem {}{}", problem.contest, problem.id);
     stdout.reset();
-    let mut downloader: Downloader = Downloader::new(session, &problem);
     let prompt = format!("cf-downloader [{} {}]> ", problem.contest, problem.id);
+    let mut downloader: Downloader = Downloader::new(session, problem);
     loop {
         match read_line(stdout, prompt.as_bytes()).trim() {
             "get_meta" => {
@@ -157,12 +157,11 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
                 break;
             }
             "get_data" => {
-                if downloader.testdata.is_empty() {
+                if downloader.is_empty() {
                     write_error!(stdout, "No metadata");
                 } else {
-                    let begin = read_usize(stdout, b"begin: ", 0, downloader.testdata.len());
-                    let end =
-                        read_usize(stdout, b"end: ", begin + 1, downloader.testdata.len() + 1);
+                    let begin = read_usize(stdout, b"begin: ", 0, downloader.len());
+                    let end = read_usize(stdout, b"end: ", begin + 1, downloader.len() + 1);
                     match rt.block_on(async {
                         downloader
                             .get_data::<encode::Encoder, Decoder>(
