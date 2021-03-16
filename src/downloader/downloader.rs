@@ -15,6 +15,7 @@ use tokio::time::{sleep, sleep_until, Instant};
 const SUBMISSION_GET_DELAY: Duration = Duration::from_secs(1);
 const SUBMIT_DELAY: Duration = Duration::from_secs(30);
 const CHECK_DELAY: Duration = Duration::from_secs(5);
+const UPDATE_RATE: usize = 7;
 
 #[derive(Serialize, Deserialize)]
 struct DataList {
@@ -25,6 +26,13 @@ pub struct Downloader<'a> {
     session: &'a Session,
     list: DataList,
 }
+
+pub trait Callback {
+    fn on_case_begin(&mut self, id: usize);
+    fn on_case_end(&mut self, id: usize);
+    fn on_progress(&mut self, _id: usize, _current: usize, _total: usize) {}
+}
+
 impl Submission {
     async fn wait_judge<'a>(self, session: &'a Session, id: usize) -> Result<Verdict> {
         let mut next = Instant::now();
@@ -54,9 +62,15 @@ impl<'a> Downloader<'a> {
         self.session.get_last_submission(&self.list.problem).await
     }
 
-    pub async fn get_meta<'b, Enc>(&mut self, template: &Template, count: usize) -> Result<()>
+    pub async fn get_meta<'b, Enc, F>(
+        &mut self,
+        template: &Template,
+        count: usize,
+        mut call: F,
+    ) -> Result<()>
     where
         Enc: MetaEncoding<'b>,
+        F: Callback,
     {
         self.list.data.reserve(count);
         let base = self.list.data.len();
@@ -69,6 +83,7 @@ impl<'a> Downloader<'a> {
         let mut next = Instant::now();
         for i in 0..count {
             sleep_until(next).await;
+            call.on_case_begin(i + base);
             self.list.data.push(Enc::decode(
                 self.submit_code(&template.language, enc.generate()?)
                     .await?
@@ -79,6 +94,7 @@ impl<'a> Downloader<'a> {
             unsafe {
                 enc.ignore(&(*self.list.data.as_ptr().add(base + i)).data_id);
             }
+            call.on_case_end(i + base);
         }
         Ok(())
     }
@@ -95,15 +111,17 @@ impl<'a> Downloader<'a> {
     pub fn save_meta(&self, dest: &path::Path) -> Result<()> {
         Ok(serde_yaml::to_writer(File::create(dest)?, &self.list)?)
     }
-    pub async fn get_data<'b, Enc, Dec>(
+    pub async fn get_data<'b, Enc, Dec, F>(
         &'b self,
         template: &Template,
         begin: usize,
         end: usize,
+        mut call: F,
     ) -> Result<Vec<String>>
     where
         Enc: DataEncoder<'b>,
         Dec: DataDecoder,
+        F: Callback,
     {
         let length = end - begin;
         let mut ret: Vec<String> = Vec::new();
@@ -118,14 +136,19 @@ impl<'a> Downloader<'a> {
             for (ind, i) in self.list.data[begin..end].into_iter().enumerate() {
                 let mut cur = VecDeque::new();
                 if let None = &i.input {
-                    cur.reserve((i.output_size + BLOCK - 1) / BLOCK);
-                    for j in (0..i.output_size).step_by(BLOCK) {
+                    call.on_case_begin(ind + begin);
+                    let count = (i.output_size + BLOCK - 1) / BLOCK;
+                    cur.reserve(count);
+                    for j in 0..count {
                         cur.push_back(
-                            self.submit_code(&template.language, encoder.generate(j)?)
+                            self.submit_code(&template.language, encoder.generate(j * BLOCK)?)
                                 .await?
                                 .wait_judge(&self.session, ind + begin + 1),
                         );
                         next += SUBMIT_DELAY;
+                        if j & UPDATE_RATE == 0 {
+                            call.on_progress(ind + begin, j, count);
+                        }
                     }
                 }
                 encoder.push_ignore(&i.data_id);
@@ -136,6 +159,7 @@ impl<'a> Downloader<'a> {
         {
             let mut decoder = Dec::new();
             for i in 0..length {
+                call.on_case_end(i + begin);
                 if let Some(p) = &self.list.data[begin + i].input {
                     ret.push(p.clone());
                 } else {

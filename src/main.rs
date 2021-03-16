@@ -3,10 +3,10 @@ extern crate termcolor;
 
 use cf_downloader::{
     client::{Problem, ProblemType, Session},
-    downloader::Downloader,
+    downloader::{Callback, Downloader},
     encoding::{
         gzip::Decoder,
-        handlebars::{encode, meta},
+        handlebars::{encode::Encoder, meta::Meta},
         Template,
     },
     types::Result,
@@ -28,26 +28,43 @@ struct Login {
     proxy: String,
 }
 
+fn set_fg(stdout: &mut StandardStream, color: Color) {
+    stdout
+        .set_color(ColorSpec::new().set_fg(Some(color)).set_intense(true))
+        .expect("Error: can't set output color");
+}
+fn reset_fg(stdout: &mut StandardStream) {
+    stdout
+        .set_color(ColorSpec::new().set_fg(None).set_intense(true))
+        .expect("Error: Can't reset color");
+}
 macro_rules! write_color {
-    ($dest:expr, $color:expr, $($arg:tt)*) => { {
-        $dest.set_color(ColorSpec::new().set_fg(Some($color))).expect("Failed to set output color");
+    ($dest:expr, $color:expr,$typ:expr,  $($arg:tt)*) => { {
+        set_fg($dest, $color);
+        write!($dest,"{}: ", $typ);
+        reset_fg($dest);
         writeln!($dest, $($arg)*).expect("Failed to write output");
     }
     };
 }
 macro_rules! write_error {
-    ($dest:expr, $($arg:tt)*) => {
-        write_color!($dest, Color::Red, $($arg)*);
+    ($dest:expr,$typ:expr, $($arg:tt)*) => {
+        write_color!($dest, Color::Red, $typ, $($arg)*);
     };
 }
 macro_rules! write_info {
-    ($dest:expr, $($arg:tt)*) => {
-        write_color!($dest, Color::Cyan, $($arg)*);
+    ($dest:expr,$typ:expr, $($arg:tt)*) => {
+        write_color!($dest, Color::Blue, $typ, $($arg)*);
     };
 }
 macro_rules! write_ok {
-    ($dest:expr, $($arg:tt)*) => {
-        write_color!($dest, Color::Green, $($arg)*);
+    ($dest:expr,$typ:expr, $($arg:tt)*) => {
+        write_color!($dest, Color::Green, $typ, $($arg)*);
+    };
+}
+macro_rules! write_progress {
+    ($dest:expr, $typ:expr, $($arg:tt)*) => {
+        write_color!($dest, Color::Cyan, $typ, $($arg)*);
     };
 }
 
@@ -62,7 +79,7 @@ fn read_line_to(stdout: &mut StandardStream, prompt: &[u8], dest: &mut String) {
                 dest.truncate(dest.trim_end().len());
                 return;
             }
-            Err(e) => write_error!(stdout, "Read error: {}", e.to_string()),
+            Err(e) => write_error!(stdout, "Error", "Read: {}", e.to_string()),
         }
         stdout.reset();
     }
@@ -82,7 +99,8 @@ fn read_usize(stdout: &mut StandardStream, prompt: &[u8], min: usize, max: usize
                 if v < min || v >= max {
                     write_error!(
                         stdout,
-                        "Value {} out of range. Expected value in [{}, {})",
+                        "Error",
+                        "parse: Value {} out of range. Expected value in [{}, {})",
                         v,
                         min,
                         max
@@ -91,7 +109,7 @@ fn read_usize(stdout: &mut StandardStream, prompt: &[u8], min: usize, max: usize
                     return v;
                 }
             }
-            Err(e) => write_error!(stdout, "Parse error: {}", e.to_string()),
+            Err(e) => write_error!(stdout, "Error", "parse: {}", e.to_string()),
         };
         stdout.reset();
     }
@@ -104,23 +122,23 @@ fn read_problem(stdout: &mut StandardStream, session: &Session, rt: &Runtime) ->
         id: String::new(),
     };
     loop {
-        read_line_to(stdout, b"Enter contest: ", &mut ret.contest);
-        read_line_to(stdout, b"Enter problem id: ", &mut ret.id);
+        read_line_to(stdout, b"Contest: ", &mut ret.contest);
+        read_line_to(stdout, b"Problem id: ", &mut ret.id);
         match rt.block_on(async { session.check_exist(&ret).await }) {
             Ok(true) => return ret,
-            Ok(false) => write_error!(stdout, "No such problem or contest."),
-            Err(e) => write_error!(stdout, "Error checking problem: {}", e.to_string()),
+            Ok(false) => write_error!(stdout, "Error", "No such problem or contest."),
+            Err(e) => write_error!(stdout, "Error", "Get problem: {}", e.to_string()),
         }
         stdout.reset();
     }
 }
 #[allow(unused_must_use)]
 fn read_template(stdout: &mut StandardStream) -> Template {
-    let lang = read_line(stdout, b"Enter language: ");
+    let lang = read_line(stdout, b"Language: ");
     let mut path = String::new();
     let mut content = String::new();
     loop {
-        read_line_to(stdout, b"Enter file path: ", &mut path);
+        read_line_to(stdout, b"File path: ", &mut path);
         match File::open(&path).and_then(|mut f: File| f.read_to_string(&mut content)) {
             Ok(_) => {
                 return Template {
@@ -128,16 +146,65 @@ fn read_template(stdout: &mut StandardStream) -> Template {
                     content: content,
                 };
             }
-            Err(e) => write_error!(stdout, "Error read file {}", e.to_string()),
+            Err(e) => write_error!(stdout, "Error", "read file: {}", e.to_string()),
         }
         stdout.reset();
+    }
+}
+
+struct GetMetaCall<'a> {
+    stdout: &'a mut StandardStream,
+}
+impl<'a> Callback for GetMetaCall<'a> {
+    #[allow(unused_must_use)]
+    fn on_case_begin(&mut self, id: usize) {
+        write_progress!(
+            self.stdout,
+            "Startting",
+            "Getting meta data for test {}",
+            id
+        );
+    }
+    #[allow(unused_must_use)]
+    fn on_case_end(&mut self, id: usize) {
+        write_ok!(self.stdout, "Finish", "Got meta data for test {}", id);
+    }
+}
+struct GetDataCall<'a> {
+    stdout: &'a mut StandardStream,
+}
+impl<'a> Callback for GetDataCall<'a> {
+    #[allow(unused_must_use)]
+    fn on_case_begin(&mut self, id: usize) {
+        write_progress!(self.stdout, "Starting", "Get input for test {}", id);
+    }
+    #[allow(unused_must_use)]
+    fn on_progress(&mut self, id: usize, current: usize, total: usize) {
+        write_info!(
+            self.stdout,
+            "Info",
+            "Got {} of {} data segment for test {}",
+            current,
+            total,
+            id
+        );
+    }
+    #[allow(unused_must_use)]
+    fn on_case_end(&mut self, id: usize) {
+        write_ok!(self.stdout, "Finished", "Get data for test {}", id);
     }
 }
 
 #[allow(unused_must_use)]
 fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
     let problem = read_problem(stdout, session, rt);
-    write_ok!(stdout, "Selected problem {}{}", problem.contest, problem.id);
+    write_info!(
+        stdout,
+        "Info",
+        "Selected problem {}{}",
+        problem.contest,
+        problem.id
+    );
     stdout.reset();
     let prompt = format!("cf-downloader [{} {}]> ", problem.contest, problem.id);
     let mut downloader: Downloader = Downloader::new(session, problem);
@@ -146,28 +213,34 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
             "get_meta" => {
                 let cnt = read_usize(stdout, b"Enter count:  ", 1, usize::MAX);
                 let template = read_template(stdout);
-                write_info!(stdout, "Loading {} more testcase's metadata", cnt);
-                if let Err(e) = rt.block_on(downloader.get_meta::<meta::Meta>(&template, cnt)) {
-                    write_error!(stdout, "{}", e.to_string());
+                write_info!(stdout, "Info", "Loading {} more testcase's metadata", cnt);
+                if let Err(e) = rt.block_on(downloader.get_meta::<Meta, _>(
+                    &template,
+                    cnt,
+                    GetMetaCall { stdout },
+                )) {
+                    write_error!(stdout, "Fail", "{}", e.to_string());
                 } else {
-                    write_ok!(stdout, "Successfully getted metadata");
+                    write_ok!(stdout, "Success", "Successfully getted metadata");
                 }
             }
             "unselect" => {
+                write_info!(stdout, "Info", "Unselected problem");
                 break;
             }
             "get_data" => {
                 if downloader.is_empty() {
-                    write_error!(stdout, "No metadata");
+                    write_error!(stdout, "Error", "No metadata");
                 } else {
                     let begin = read_usize(stdout, b"begin: ", 0, downloader.len());
                     let end = read_usize(stdout, b"end: ", begin + 1, downloader.len() + 1);
                     match rt.block_on(async {
                         downloader
-                            .get_data::<encode::Encoder, Decoder>(
+                            .get_data::<Encoder, Decoder, _>(
                                 &read_template(stdout),
                                 begin,
                                 end,
+                                GetDataCall { stdout },
                             )
                             .await
                     }) {
@@ -176,15 +249,11 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
                                 if let Err(e) = File::create(format!("{}.in", i))
                                     .and_then(|mut f: File| f.write(v[i - begin].as_bytes()))
                                 {
-                                    write_error!(
-                                        stdout,
-                                        "Error in writing file: {}",
-                                        e.to_string()
-                                    );
+                                    write_error!(stdout, "Fail", "write: {}", e.to_string());
                                 }
                             }
                         }
-                        Err(e) => write_error!(stdout, "Failed getting data: {}", e.to_string()),
+                        Err(e) => write_error!(stdout, "Fail", "get_data: {}", e.to_string()),
                     };
                 }
             }
@@ -192,19 +261,19 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
                 match downloader
                     .load_meta(Path::new(read_line(stdout, b"Enter file path: ").as_str()))
                 {
-                    Ok(_) => write_ok!(stdout, "Successfully loaded metadata"),
-                    Err(e) => write_error!(stdout, "Error loading metadata: {}", e.to_string()),
+                    Ok(_) => write_ok!(stdout, "Success", "Loaded metadata"),
+                    Err(e) => write_error!(stdout, "Fail", "load: {}", e.to_string()),
                 }
             }
             "save" => {
                 match downloader
                     .save_meta(Path::new(read_line(stdout, b"Enter file path: ").as_str()))
                 {
-                    Ok(_) => write_ok!(stdout, "Successfully writed metadata to file"),
-                    Err(e) => write_error!(stdout, "Error writing metadata: {}", e.to_string()),
+                    Ok(_) => write_ok!(stdout, "Success", "Writed metadata to file"),
+                    Err(e) => write_error!(stdout, "Fail", "write: {}", e.to_string()),
                 }
             }
-            unknown => write_error!(stdout, "Unknown command {}", unknown),
+            unknown => write_error!(stdout, "Error", "problem: Unknown command {}", unknown),
         }
         stdout.reset();
     }
@@ -222,6 +291,7 @@ fn main() {
     let info: Login = Login::parse();
     write_info!(
         &mut stdout,
+        "Info",
         "Loging into codeforces.com as {} proxy: {}",
         info.handle,
         info.proxy
@@ -229,11 +299,11 @@ fn main() {
 
     let session = match rt.block_on(login(info)) {
         Ok(v) => {
-            write_ok!(&mut stdout, "Logged into codeforces.com");
+            write_ok!(&mut stdout, "Success", "Logged into codeforces.com");
             v
         }
         Err(e) => {
-            write_error!(&mut stdout, "Failed to login: {}", e.to_string());
+            write_error!(&mut stdout, "Fail", "login: {}", e.to_string());
             stdout.reset();
             return;
         }
@@ -246,13 +316,18 @@ fn main() {
                 problem_loop(&mut stdout, &session, &rt);
             }
             "exit" => break,
-            unknown => write_error!(&mut stdout, r#"unknown command "{}""#, unknown),
+            unknown => write_error!(
+                &mut stdout,
+                "Error",
+                r#"cf-downloader: unknown command "{}""#,
+                unknown
+            ),
         }
         stdout.reset();
     }
 
-    write_info!(&mut stdout, "Logging out from codeforces.com");
+    write_info!(&mut stdout, "Info", "Logging out from codeforces.com");
     rt.block_on(session.logout()).unwrap();
-    write_ok!(&mut stdout, "Logged out from codeforces.com");
+    write_ok!(&mut stdout, "Success", "Logged out from codeforces.com");
     stdout.reset();
 }
