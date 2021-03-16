@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, fs::File, path, time::Duration, vec::Vec};
 use tokio::time::{sleep, sleep_until, Instant};
 const SUBMISSION_GET_DELAY: Duration = Duration::from_secs(1);
-const SUBMIT_DELAY: Duration = Duration::from_secs(30);
-const CHECK_DELAY: Duration = Duration::from_secs(5);
+const SUBMIT_DELAY: Duration = Duration::from_secs(10);
+const CHECK_DELAY: Duration = Duration::from_secs(3);
 const UPDATE_RATE: usize = 7;
 
 #[derive(Serialize, Deserialize)]

@@ -30,7 +30,7 @@ pub struct Verdict {
 }
 
 pub struct Submission {
-    pub id: String,
+    id: String,
     csrf_token: String,
 }
 fn full_data_or(data: String) -> Option<String> {
