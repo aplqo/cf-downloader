@@ -160,7 +160,7 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
                 if downloader.testdata.is_empty() {
                     write_error!(stdout, "No metadata");
                 } else {
-                    let begin = read_usize(stdout, b"begin: ", 0, prompt.len());
+                    let begin = read_usize(stdout, b"begin: ", 0, downloader.testdata.len());
                     let end =
                         read_usize(stdout, b"end: ", begin + 1, downloader.testdata.len() + 1);
                     match rt.block_on(async {
@@ -174,7 +174,7 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
                     }) {
                         Ok(v) => {
                             for i in begin..end {
-                                if let Err(e) = File::create(i.to_string())
+                                if let Err(e) = File::create(format!("{}.in", i))
                                     .and_then(|mut f: File| f.write(v[i - begin].as_bytes()))
                                 {
                                     write_error!(
