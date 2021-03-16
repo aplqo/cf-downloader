@@ -20,13 +20,13 @@ pub struct Downloader<'a> {
     pub testdata: Vec<TestMeta>,
 }
 impl Submission {
-    async fn wait_judge<'a>(self, session: &'a Session) -> Result<Verdict> {
+    async fn wait_judge<'a>(self, session: &'a Session, id: usize) -> Result<Verdict> {
         let mut next = Instant::now();
         while !self.is_judged(session).await {
             next += CHECK_DELAY;
             sleep_until(next).await;
         }
-        self.get_verdict(session).await
+        self.get_verdict(session, id).await
     }
 }
 
@@ -58,12 +58,12 @@ impl<'a> Downloader<'a> {
             }
         }
         let mut next = Instant::now();
-        for i in 0..count - 1 {
+        for i in 0..count {
             sleep_until(next).await;
             self.testdata.push(Enc::decode(
                 self.submit_code(&template.language, enc.generate()?)
                     .await?
-                    .wait_judge(&self.session)
+                    .wait_judge(&self.session, base + i + 1)
                     .await?,
             )?);
             next += SUBMIT_DELAY;
@@ -99,7 +99,7 @@ impl<'a> Downloader<'a> {
             for i in &self.testdata[0..begin] {
                 encoder.push_ignore(&i.data_id);
             }
-            for i in &self.testdata[begin..end] {
+            for (ind, i) in self.testdata[begin..end].into_iter().enumerate() {
                 let mut cur = VecDeque::new();
                 if let None = &i.input {
                     cur.reserve((i.output_size + BLOCK - 1) / BLOCK);
@@ -107,7 +107,7 @@ impl<'a> Downloader<'a> {
                         cur.push_back(
                             self.submit_code(&template.language, encoder.generate(j)?)
                                 .await?
-                                .wait_judge(&self.session),
+                                .wait_judge(&self.session, ind + begin + 1),
                         );
                         next += SUBMIT_DELAY;
                     }
