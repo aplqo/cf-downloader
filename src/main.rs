@@ -51,6 +51,7 @@ macro_rules! write_ok {
     };
 }
 
+#[allow(unused_must_use)]
 fn read_line_to(stdout: &mut StandardStream, prompt: &[u8], dest: &mut String) {
     dest.clear();
     loop {
@@ -71,6 +72,7 @@ fn read_line(stdout: &mut StandardStream, prompt: &[u8]) -> String {
     read_line_to(stdout, prompt, &mut ret);
     return ret;
 }
+#[allow(unused_must_use)]
 fn read_usize(stdout: &mut StandardStream, prompt: &[u8], min: usize, max: usize) -> usize {
     let mut buf = String::new();
     loop {
@@ -90,10 +92,11 @@ fn read_usize(stdout: &mut StandardStream, prompt: &[u8], min: usize, max: usize
                 }
             }
             Err(e) => write_error!(stdout, "Parse error: {}", e.to_string()),
-        }
+        };
         stdout.reset();
     }
 }
+#[allow(unused_must_use)]
 fn read_problem(stdout: &mut StandardStream, session: &Session, rt: &Runtime) -> Problem {
     let mut ret = Problem {
         source: ProblemType::Contest,
@@ -111,6 +114,7 @@ fn read_problem(stdout: &mut StandardStream, session: &Session, rt: &Runtime) ->
         stdout.reset();
     }
 }
+#[allow(unused_must_use)]
 fn read_template(stdout: &mut StandardStream) -> Template {
     let lang = read_line(stdout, b"Enter language: ");
     let mut path = String::new();
@@ -126,9 +130,11 @@ fn read_template(stdout: &mut StandardStream) -> Template {
             }
             Err(e) => write_error!(stdout, "Error read file {}", e.to_string()),
         }
+        stdout.reset();
     }
 }
 
+#[allow(unused_must_use)]
 fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
     let problem = read_problem(stdout, session, rt);
     write_ok!(stdout, "Selected problem {}{}", problem.contest, problem.id);
@@ -193,7 +199,7 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
             }
             "save" => {
                 match downloader
-                    .save_meta(Path::new(read_line(stdout, b"Enter file path").as_str()))
+                    .save_meta(Path::new(read_line(stdout, b"Enter file path: ").as_str()))
                 {
                     Ok(_) => write_ok!(stdout, "Successfully writed metadata to file"),
                     Err(e) => write_error!(stdout, "Error writing metadata: {}", e.to_string()),
@@ -210,6 +216,7 @@ async fn login(login: Login) -> Result<Session> {
     Ok(ret)
 }
 
+#[allow(unused_must_use)]
 fn main() {
     let rt = Runtime::new().unwrap();
     let mut stdout = StandardStream::stdout(ColorChoice::Auto);
