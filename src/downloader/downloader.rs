@@ -8,7 +8,7 @@ use crate::{
     },
     types::{Result, TestMeta, BLOCK},
 };
-use futures::{executor::block_on, future::try_join_all};
+use futures::future::try_join_all;
 use std::{collections::VecDeque, fs::File, path, time::Duration, vec::Vec};
 use tokio::time::{sleep_until, Instant};
 const SUBMIT_DELAY: Duration = Duration::from_secs(30);
@@ -45,7 +45,7 @@ impl<'a> Downloader<'a> {
         self.session.get_last_submission(&self.problem).await
     }
 
-    pub fn get_meta<'b, Enc>(&mut self, template: &Template, count: usize) -> Result<()>
+    pub async fn get_meta<'b, Enc>(&mut self, template: &Template, count: usize) -> Result<()>
     where
         Enc: MetaEncoding<'b>,
     {
@@ -59,13 +59,13 @@ impl<'a> Downloader<'a> {
         }
         let mut next = Instant::now();
         for i in 0..count - 1 {
-            self.testdata.push(Enc::decode(block_on(async {
-                sleep_until(next).await;
+            sleep_until(next).await;
+            self.testdata.push(Enc::decode(
                 self.submit_code(&template.language, enc.generate()?)
                     .await?
                     .wait_judge(&self.session)
-                    .await
-            })?)?);
+                    .await?,
+            )?);
             next += SUBMIT_DELAY;
             unsafe {
                 enc.ignore(&(*self.testdata.as_ptr().add(base + i)).data_id);

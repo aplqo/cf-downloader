@@ -2,7 +2,6 @@ extern crate regex;
 extern crate reqwest;
 
 use crate::types::{Error, Result};
-use futures::executor::block_on;
 use regex::Regex;
 use reqwest::{Client, Proxy};
 use std::{collections::HashMap, result::Result as StdResult};
@@ -78,9 +77,9 @@ struct UtilityRegex {
 impl UtilityRegex {
     fn new() -> Self {
         UtilityRegex {
-            csrf: Regex::new("csrf='(.+?)'").unwrap(),
-            login: Regex::new(r#"handle = "([\s\S]+?)"#).unwrap(),
-            submit: Regex::new(r#"error[a-zA-Z_\-\ ]*">(.*?)</span>"#).unwrap(),
+            csrf: Regex::new("csrf='(.+)'").unwrap(),
+            login: Regex::new(r#"handle = "[\s\S]+"#).unwrap(),
+            submit: Regex::new(r#"error[a-zA-Z_\-\\ ]*">(.*)</span>"#).unwrap(),
             last_submit: Regex::new(r#"<tr class="last-row" data-submission-id="([[:digit:]]+)""#)
                 .unwrap(),
         }
@@ -120,27 +119,26 @@ impl Session {
             .to_string())
     }
 
-    pub fn login(&self, password: &str) -> Result<()> {
+    pub async fn login(&self, password: &str) -> Result<()> {
         const URL: &str = "https://codeforces.com/enter";
-        let body = block_on(async {
-            let csrf = self.get_csrf(URL).await?;
-            self.client
-                .post(URL)
-                .query(&[
-                    ("csrf_token", csrf.as_str()),
-                    ("action", "enter"),
-                    ("ftaa", self.ftaa.as_str()),
-                    ("bfaa", BFAA),
-                    ("handle_or_email", self.handle.as_str()),
-                    ("password", password),
-                    ("_tta", "176"),
-                    ("remember", "off"),
-                ])
-                .send()
-                .await?
-                .text()
-                .await
-        })?;
+        let csrf = self.get_csrf(URL).await?;
+        let body = self
+            .client
+            .post(URL)
+            .query(&[
+                ("csrf_token", csrf.as_str()),
+                ("action", "enter"),
+                ("ftaa", self.ftaa.as_str()),
+                ("bfaa", BFAA),
+                ("handle_or_email", self.handle.as_str()),
+                ("password", password),
+                ("_tta", "176"),
+                ("remember", "off"),
+            ])
+            .send()
+            .await?
+            .text()
+            .await?;
         if self.regex.login.is_match(body.as_str()) {
             Ok(())
         } else {
@@ -220,13 +218,11 @@ impl Session {
             != "https://codeforces.com")
     }
 
-    pub fn logout(&self) -> Result<()> {
-        block_on(async {
-            self.client
-                .get("https://codeforces.com/logout")
-                .send()
-                .await?;
-            Ok(())
-        })
+    pub async fn logout(&self) -> Result<()> {
+        self.client
+            .get("https://codeforces.com/logout")
+            .send()
+            .await?;
+        Ok(())
     }
 }
