@@ -41,7 +41,7 @@ fn reset_fg(stdout: &mut StandardStream) {
 macro_rules! write_color {
     ($dest:expr, $color:expr,$typ:expr,  $($arg:tt)*) => { {
         set_fg($dest, $color);
-        write!($dest,"{}: ", $typ);
+        write!($dest,"{:>8}: ", $typ);
         reset_fg($dest);
         writeln!($dest, $($arg)*).expect("Failed to write output");
     }
@@ -158,12 +158,7 @@ struct GetMetaCall<'a> {
 impl<'a> Callback for GetMetaCall<'a> {
     #[allow(unused_must_use)]
     fn on_case_begin(&mut self, id: usize) {
-        write_progress!(
-            self.stdout,
-            "Startting",
-            "Getting meta data for test {}",
-            id
-        );
+        write_progress!(self.stdout, "Start", "Get meta data for test {}", id);
     }
     #[allow(unused_must_use)]
     fn on_case_end(&mut self, id: usize) {
@@ -176,7 +171,7 @@ struct GetDataCall<'a> {
 impl<'a> Callback for GetDataCall<'a> {
     #[allow(unused_must_use)]
     fn on_case_begin(&mut self, id: usize) {
-        write_progress!(self.stdout, "Starting", "Get input for test {}", id);
+        write_progress!(self.stdout, "Start", "Get input for test {}", id);
     }
     #[allow(unused_must_use)]
     fn on_progress(&mut self, id: usize, current: usize, total: usize) {
@@ -191,7 +186,7 @@ impl<'a> Callback for GetDataCall<'a> {
     }
     #[allow(unused_must_use)]
     fn on_case_end(&mut self, id: usize) {
-        write_ok!(self.stdout, "Finished", "Get data for test {}", id);
+        write_ok!(self.stdout, "Finish", "Get data for test {}", id);
     }
 }
 
@@ -211,7 +206,7 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
     loop {
         match read_line(stdout, prompt.as_bytes()).trim() {
             "get_meta" => {
-                let cnt = read_usize(stdout, b"Enter count:  ", 1, usize::MAX);
+                let cnt = read_usize(stdout, b"Count: ", 1, usize::MAX);
                 let template = read_template(stdout);
                 write_info!(stdout, "Info", "Loading {} more testcase's metadata", cnt);
                 if let Err(e) = rt.block_on(downloader.get_meta::<Meta, _>(
@@ -232,8 +227,8 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
                 if downloader.is_empty() {
                     write_error!(stdout, "Error", "No metadata");
                 } else {
-                    let begin = read_usize(stdout, b"begin: ", 0, downloader.len());
-                    let end = read_usize(stdout, b"end: ", begin + 1, downloader.len() + 1);
+                    let begin = read_usize(stdout, b"Begin: ", 0, downloader.len());
+                    let end = read_usize(stdout, b"End: ", begin + 1, downloader.len() + 1);
                     match rt.block_on(async {
                         downloader
                             .get_data::<Encoder, Decoder, _>(
@@ -258,17 +253,13 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
                 }
             }
             "load" => {
-                match downloader
-                    .load_meta(Path::new(read_line(stdout, b"Enter file path: ").as_str()))
-                {
+                match downloader.load_meta(Path::new(read_line(stdout, b"File path: ").as_str())) {
                     Ok(_) => write_ok!(stdout, "Success", "Loaded metadata"),
                     Err(e) => write_error!(stdout, "Fail", "load: {}", e.to_string()),
                 }
             }
             "save" => {
-                match downloader
-                    .save_meta(Path::new(read_line(stdout, b"Enter file path: ").as_str()))
-                {
+                match downloader.save_meta(Path::new(read_line(stdout, b"File path: ").as_str())) {
                     Ok(_) => write_ok!(stdout, "Success", "Writed metadata to file"),
                     Err(e) => write_error!(stdout, "Fail", "write: {}", e.to_string()),
                 }
