@@ -1,20 +1,33 @@
 extern crate serde;
 
 use crate::{
-    client::{Problem, Session, Verdict},
+    client::{Problem, Session, Submission, Verdict},
     encoding::{
         traits::{DataDecoder, DataEncoder, MetaEncoding},
         Template,
     },
     types::{Result, TestMeta, BLOCK},
 };
-use futures::executor::block_on;
-use std::{fs::File, path, vec::Vec};
+use futures::{executor::block_on, future::try_join_all};
+use std::{collections::VecDeque, fs::File, path, time::Duration, vec::Vec};
+use tokio::time::{sleep_until, Instant};
+const SUBMIT_DELAY: Duration = Duration::from_secs(30);
+const CHECK_DELAY: Duration = Duration::from_secs(5);
 
 pub struct Downloader<'a> {
     session: &'a Session,
     problem: &'a Problem,
     pub testdata: Vec<TestMeta>,
+}
+impl Submission {
+    async fn wait_judge<'a>(self, session: &'a Session) -> Result<Verdict> {
+        let mut next = Instant::now();
+        while !self.is_judged(session).await {
+            next += CHECK_DELAY;
+            sleep_until(next).await;
+        }
+        self.get_verdict(session).await
+    }
 }
 
 impl<'a> Downloader<'a> {
@@ -25,11 +38,11 @@ impl<'a> Downloader<'a> {
             testdata: Vec::new(),
         }
     }
-    async fn submit_code(&self, lang: &'a str, code: &'a str) -> Result<Verdict> {
-        self.session.submit(&self.problem, lang, code).await?;
-        let sub = self.session.get_last_submission(&self.problem).await?;
-        while !sub.is_judged(self.session).await {}
-        sub.get_verdict(self.session).await
+    async fn submit_code(&self, lang: &String, code: &String) -> Result<Submission> {
+        self.session
+            .submit(&self.problem, lang.as_str(), code.as_str())
+            .await?;
+        self.session.get_last_submission(&self.problem).await
     }
 
     pub fn get_meta<'b, Enc>(&mut self, template: &Template, count: usize) -> Result<()>
@@ -44,10 +57,16 @@ impl<'a> Downloader<'a> {
                 enc.ignore(&(*self.testdata.as_ptr().add(i)).data_id);
             }
         }
+        let mut next = Instant::now();
         for i in 0..count - 1 {
             self.testdata.push(Enc::decode(block_on(async {
-                self.submit_code(template.language, enc.generate()?).await
+                sleep_until(next).await;
+                self.submit_code(&template.language, enc.generate()?)
+                    .await?
+                    .wait_judge(&self.session)
+                    .await
             })?)?);
+            next += SUBMIT_DELAY;
             unsafe {
                 enc.ignore(&(*self.testdata.as_ptr().add(base + i)).data_id);
             }
@@ -60,10 +79,9 @@ impl<'a> Downloader<'a> {
     pub fn save_meta(&self, dest: &path::Path) -> Result<()> {
         Ok(serde_yaml::to_writer(File::create(dest)?, &self.testdata)?)
     }
-
     pub async fn get_data<'b, Enc, Dec>(
         &'b self,
-        template: &Template<'b>,
+        template: &Template,
         begin: usize,
         end: usize,
     ) -> Result<Vec<String>>
@@ -71,27 +89,50 @@ impl<'a> Downloader<'a> {
         Enc: DataEncoder<'b>,
         Dec: DataDecoder,
     {
-        let mut encoder = Enc::new(template, end)?;
-        let mut decoder = Dec::new();
-        for i in &self.testdata[0..begin] {
-            encoder.push_ignore(&i.data_id);
-        }
+        let length = end - begin;
         let mut ret: Vec<String> = Vec::new();
-        ret.reserve(end - begin);
-        for i in &self.testdata[begin..end] {
-            decoder.init(i);
-            let count = (i.output_size + BLOCK - 1) / BLOCK;
-            for j in 0..count {
-                decoder.add_message(
-                    j * BLOCK,
-                    &self
-                        .submit_code(template.language, encoder.generate(j * BLOCK)?)
-                        .await?
-                        .output,
-                );
+        let mut verdicts = VecDeque::new();
+        verdicts.reserve(length);
+        {
+            let mut encoder = Enc::new(template, end)?;
+            let mut next = Instant::now();
+            for i in &self.testdata[0..begin] {
+                encoder.push_ignore(&i.data_id);
             }
-            ret.push(decoder.decode()?);
-            encoder.push_ignore(&i.data_id);
+            for i in &self.testdata[begin..end] {
+                let mut cur = VecDeque::new();
+                if let None = &i.input {
+                    cur.reserve((i.output_size + BLOCK - 1) / BLOCK);
+                    for j in (0..i.output_size).step_by(BLOCK) {
+                        cur.push_back(
+                            self.submit_code(&template.language, encoder.generate(j)?)
+                                .await?
+                                .wait_judge(&self.session),
+                        );
+                        next += SUBMIT_DELAY;
+                    }
+                }
+                encoder.push_ignore(&i.data_id);
+                verdicts.push_back(cur);
+            }
+        }
+        ret.reserve(length);
+        {
+            let mut decoder = Dec::new();
+            for i in 0..length {
+                if let Some(p) = &self.testdata[begin + i].input {
+                    ret.push(p.clone());
+                } else {
+                    decoder.init(&self.testdata[i]);
+                    let mut offset: usize = 0;
+                    for s in try_join_all(verdicts.pop_front().unwrap()).await? {
+                        decoder.add_message(offset, s.output.as_str());
+                        offset += BLOCK;
+                    }
+                    ret.push(decoder.decode()?);
+                    decoder.clear();
+                }
+            }
         }
         Ok(ret)
     }
