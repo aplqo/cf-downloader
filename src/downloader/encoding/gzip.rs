@@ -30,7 +30,8 @@ impl traits::DataDecoder for Decoder {
         self.buffer[offset..offset + message.len()].copy_from_slice(message.as_bytes());
     }
     fn clear(&mut self) {
-        self.buffer.resize(0, 0);
+        self.buffer.clear();
+        self.decoded.clear();
     }
     fn decode(&mut self) -> Result<String> {
         let mut ret = String::new();
