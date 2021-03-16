@@ -11,7 +11,8 @@ use crate::{
 use futures::future::try_join_all;
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, fs::File, path, time::Duration, vec::Vec};
-use tokio::time::{sleep_until, Instant};
+use tokio::time::{sleep, sleep_until, Instant};
+const SUBMISSION_GET_DELAY: Duration = Duration::from_secs(1);
 const SUBMIT_DELAY: Duration = Duration::from_secs(30);
 const CHECK_DELAY: Duration = Duration::from_secs(5);
 
@@ -49,6 +50,7 @@ impl<'a> Downloader<'a> {
         self.session
             .submit(&self.list.problem, lang.as_str(), code.as_str())
             .await?;
+        sleep(SUBMISSION_GET_DELAY).await;
         self.session.get_last_submission(&self.list.problem).await
     }
 
