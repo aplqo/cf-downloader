@@ -7,6 +7,7 @@ use regex::Regex;
 use reqwest::{Client, Proxy};
 use std::{collections::HashMap, result::Result as StdResult};
 
+const MAX_OUTPUT: usize = 500;
 const BFAA: &str = "f1b3f18c715565b589b7823cda7448ce";
 const FIREFOX_UA: &str = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0";
 
@@ -20,8 +21,9 @@ pub struct Problem {
     pub id: String,
 }
 pub struct Verdict {
-    pub output: String,
-    pub answer: Option<String>,
+    pub(crate) input: Option<String>,
+    pub(crate) output: String,
+    pub(crate) answer: Option<String>,
 }
 
 impl Problem {}
@@ -29,6 +31,13 @@ impl Problem {}
 pub struct Submission {
     id: String,
     csrf_token: String,
+}
+fn full_data_or(data: String) -> Option<String> {
+    if data.len() > MAX_OUTPUT {
+        None
+    } else {
+        Some(data)
+    }
 }
 impl Submission {
     async fn get_info(
@@ -53,15 +62,10 @@ impl Submission {
     pub async fn get_verdict(&self, session: &Session) -> Result<Verdict> {
         let mut data = self.get_info(session).await?;
         let pos = data.remove("testCount").unwrap();
-        let output = data.remove(&format!("output#{}", pos)).unwrap();
-        let answer = data.remove(&format!("answer#{}", pos)).unwrap();
         Ok(Verdict {
-            output,
-            answer: if answer.len() > 500 {
-                None
-            } else {
-                Some(answer)
-            },
+            input: full_data_or(data.remove(&format!("input#{}", pos)).unwrap()),
+            output: data.remove(&format!("output#{}", pos)).unwrap(),
+            answer: full_data_or(data.remove(&format!("answer#{}", pos)).unwrap()),
         })
     }
 }

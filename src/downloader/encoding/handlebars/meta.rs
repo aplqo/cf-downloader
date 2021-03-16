@@ -47,6 +47,7 @@ impl<'a> traits::MetaEncoding<'a> for Meta<'a> {
                 hash: p.nth(0).ok_or("Can't get input hash")?.to_string(),
                 answer: message.answer,
             },
+            input: message.input,
         })
     }
 }
