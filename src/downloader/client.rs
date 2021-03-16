@@ -45,8 +45,8 @@ impl Submission {
     ) -> StdResult<HashMap<String, String>, reqwest::Error> {
         session
             .client
-            .get("https://codeforces.com/data/submitSource")
-            .query(&[("submissionId", &self.id), ("csrf_token", &self.csrf_token)])
+            .post("https://codeforces.com/data/submitSource")
+            .form(&[("submissionId", &self.id), ("csrf_token", &self.csrf_token)])
             .send()
             .await?
             .json::<HashMap<String, String>>()
@@ -58,9 +58,12 @@ impl Submission {
             !p.contains("verdict-waiting")
         })
     }
-    pub async fn get_verdict(&self, session: &Session) -> Result<Verdict> {
+    pub async fn get_verdict(&self, session: &Session, id: usize) -> Result<Verdict> {
         let mut data = self.get_info(session).await?;
         let pos = data.remove("testCount").unwrap();
+        if pos.parse::<usize>().unwrap() != id {
+            return Err(Error::new(String::from("Test count not expected")));
+        }
         Ok(Verdict {
             input: full_data_or(data.remove(&format!("input#{}", pos)).unwrap()),
             output: data.remove(&format!("output#{}", pos)).unwrap(),
@@ -80,8 +83,7 @@ impl UtilityRegex {
             csrf: Regex::new("csrf='(.+)'").unwrap(),
             login: Regex::new(r#"handle = "[[:word:]]+"#).unwrap(),
             submit: Regex::new(r#"error[a-zA-Z_\-\\ ]*">(.*)</span>"#).unwrap(),
-            last_submit: Regex::new(r#"<tr class="last-row" data-submission-id="([[:digit:]]+)""#)
-                .unwrap(),
+            last_submit: Regex::new(r#"data-submission-id="([[:digit:]]+)""#).unwrap(),
         }
     }
 }
@@ -151,7 +153,8 @@ impl Session {
         let body = self
             .client
             .post(url)
-            .query(&[
+            .query(&[("order", "BY_ARRIVED_DESC")])
+            .form(&[
                 ("csrf_token", csrf.as_str()),
                 ("action", "setupSubmissionFilter"),
                 ("frameProblemIndex", problem.id.as_str()),
@@ -160,7 +163,7 @@ impl Session {
                 ("comparisonType", "NOT_USED"),
                 ("judgedTestCount", ""),
                 ("participantSubstring", self.handle.as_str()),
-                ("_tta", "373"),
+                ("_tta", "54"),
             ])
             .send()
             .await?
@@ -175,23 +178,21 @@ impl Session {
         }
     }
     pub async fn submit(&self, problem: &Problem, language: &str, code: &str) -> Result<()> {
-        let csrf = self.get_csrf("https://codeforces.com").await?;
+        let url = format!("https://codeforces.com/contest/{}/submit", problem.contest);
+        let csrf = self.get_csrf(url.as_str()).await?;
         let body = self
             .client
-            .post(format!(
-                "https://codeforces.com/submit?csrf_token={}",
-                csrf.as_str()
-            ))
+            .post(format!("{}?csrf_token={}", url, csrf))
             .query(&[
                 ("csrf_token", csrf.as_str()),
                 ("ftaa", self.ftaa.as_str()),
                 ("bfaa", BFAA),
                 ("action", "submitSolutionFormSubmitted"),
-                ("problemTypeId", language),
                 ("submittedProblemIndex", problem.id.as_str()),
+                ("programTypeId", language),
                 ("contestId", problem.contest.as_str()),
                 ("source", code),
-                ("tabsize", "4"),
+                ("tabSize", "4"),
                 ("_tta", "594"),
                 ("sourceCodeConfirmed", "true"),
             ])
