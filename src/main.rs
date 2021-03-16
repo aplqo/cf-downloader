@@ -116,7 +116,7 @@ fn read_template(stdout: &mut StandardStream) -> Template {
     let mut path = String::new();
     let mut content = String::new();
     loop {
-        read_line_to(stdout, b"Enter file path", &mut path);
+        read_line_to(stdout, b"Enter file path: ", &mut path);
         match File::open(&path).and_then(|mut f: File| f.read_to_string(&mut content)) {
             Ok(_) => {
                 return Template {
@@ -138,11 +138,11 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
     loop {
         match read_line(stdout, prompt.as_bytes()).trim() {
             "get_meta" => {
-                let cnt = read_usize(stdout, b"How much", 1, usize::MAX);
+                let cnt = read_usize(stdout, b"Enter count:  ", 1, usize::MAX);
                 let template = read_template(stdout);
                 write_info!(stdout, "Loading {} more testcase's metadata", cnt);
                 if let Err(e) = rt.block_on(downloader.get_meta::<meta::Meta>(&template, cnt)) {
-                    stdout.write(e.to_string().as_bytes());
+                    write_error!(stdout, "{}", e.to_string());
                 } else {
                     write_ok!(stdout, "Successfully getted metadata");
                 }
