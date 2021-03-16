@@ -5,13 +5,12 @@ use crate::{
     encoding::traits,
     types::{Result, TestMeta},
 };
-use flate2::Decompress;
-use std::vec::Vec;
+use flate2::read::GzDecoder;
+use std::{io::Read, vec::Vec};
 
 pub struct Decoder {
     buffer: Vec<u8>,
     decoded: Vec<u8>,
-    decompress: Decompress,
 }
 
 impl traits::DataDecoder for Decoder {
@@ -19,7 +18,6 @@ impl traits::DataDecoder for Decoder {
         Decoder {
             buffer: Vec::new(),
             decoded: Vec::new(),
-            decompress: Decompress::new(true),
         }
     }
     fn init(&mut self, data: &TestMeta) {
@@ -36,13 +34,8 @@ impl traits::DataDecoder for Decoder {
     fn decode(&mut self) -> Result<String> {
         let mut ret = String::new();
         base64::decode_config_buf(&self.buffer, base64::STANDARD, &mut self.decoded)?;
-        unsafe {
-            self.decompress.decompress_vec(
-                self.decoded.as_slice(),
-                ret.as_mut_vec(),
-                flate2::FlushDecompress::Finish,
-            )?;
-        };
+        let mut dec = GzDecoder::new(self.decoded.as_slice());
+        dec.read_to_string(&mut ret)?;
         Ok(ret)
     }
 }
