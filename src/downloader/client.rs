@@ -78,7 +78,7 @@ impl UtilityRegex {
     fn new() -> Self {
         UtilityRegex {
             csrf: Regex::new("csrf='(.+)'").unwrap(),
-            login: Regex::new(r#"handle = "[\s\S]+"#).unwrap(),
+            login: Regex::new(r#"handle = "[[:word:]]+"#).unwrap(),
             submit: Regex::new(r#"error[a-zA-Z_\-\\ ]*">(.*)</span>"#).unwrap(),
             last_submit: Regex::new(r#"<tr class="last-row" data-submission-id="([[:digit:]]+)""#)
                 .unwrap(),
@@ -130,7 +130,7 @@ impl Session {
                 ("action", "enter"),
                 ("ftaa", self.ftaa.as_str()),
                 ("bfaa", BFAA),
-                ("handle_or_email", self.handle.as_str()),
+                ("handleOrEmail", self.handle.as_str()),
                 ("password", password),
                 ("_tta", "176"),
                 ("remember", "off"),
