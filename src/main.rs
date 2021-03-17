@@ -3,7 +3,7 @@ extern crate termcolor;
 
 use cf_downloader::{
     client::{Problem, ProblemType, Session},
-    downloader::{Callback, Downloader},
+    downloader::{Callback, Downloader, CHECK_DELAY, SUBMISSION_GET_DELAY, SUBMIT_DELAY},
     encoding::{
         gzip::Decoder,
         handlebars::{encode::Encoder, meta::Meta},
@@ -16,7 +16,7 @@ use std::{
     fs::File,
     io::{stdin, Read, Write},
     path::Path,
-    writeln,
+    println, writeln,
 };
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
@@ -275,8 +275,27 @@ async fn login(login: Login) -> Result<Session> {
     Ok(ret)
 }
 
+fn print_version() {
+    println!(
+        "{} {} {}",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        env!("BUILD_TYPE")
+    );
+    println!("version: {} git@{}", env!("GIT_BRANCH"), env!("GIT_HASH"));
+    println!("build date: {}", env!("BUILD_TIME"));
+    println!("build on {} with {}", env!("BUILD_HOST"), env!("RUSTC"),);
+    println!(
+        "Submit rate:\n\t submit delay: {}s \n\t get submission delay: {}s \n\t check delay: {}s",
+        SUBMIT_DELAY.as_secs_f32(),
+        SUBMISSION_GET_DELAY.as_secs_f32(),
+        CHECK_DELAY.as_secs_f32()
+    );
+}
+
 #[allow(unused_must_use)]
 fn main() {
+    print_version();
     let rt = Runtime::new().unwrap();
     let mut stdout = StandardStream::stdout(ColorChoice::Auto);
     let info: Login = Login::parse();
