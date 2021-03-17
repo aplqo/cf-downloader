@@ -208,17 +208,11 @@ impl Session {
         }
     }
     pub async fn check_exist(&self, problem: &Problem) -> Result<bool> {
-        Ok(self
-            .client
-            .get(format!(
-                "https://codeforces.com/contest/{}/problem/{}",
-                problem.contest, problem.id
-            ))
-            .send()
-            .await?
-            .url()
-            .as_str()
-            != "https://codeforces.com")
+        let url = format!(
+            "https://codeforces.com/contest/{}/problem/{}",
+            problem.contest, problem.id
+        );
+        Ok(url == self.client.get(&url).send().await?.url().as_str())
     }
 
     pub async fn logout(&self) -> Result<()> {
