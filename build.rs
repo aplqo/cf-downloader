@@ -1,42 +1,84 @@
-use chrono::Local;
-use std::{env, println, process::Command};
+use chrono::{DateTime, Local};
+use std::{env, io::Write, path::Path, process::Command, time::Duration};
+include!("./src/downloader/delay.rs");
 
-fn set_env(key: &str, val: &str) {
-    println!("cargo:rustc-env={}={}", key, val);
+fn launch(cmd: &mut Command) -> String {
+    String::from_utf8(cmd.output().unwrap().stdout).unwrap()
 }
-fn to_string(val: Vec<u8>) -> String {
-    String::from_utf8(val).unwrap()
-}
-fn exec_args<I: std::iter::IntoIterator<Item = impl AsRef<std::ffi::OsStr>>>(
+fn exec<I: std::iter::IntoIterator<Item = impl AsRef<std::ffi::OsStr>>>(
     cmd: &str,
     args: I,
 ) -> String {
-    to_string(Command::new(cmd).args(args).output().unwrap().stdout)
+    launch(Command::new(cmd).args(args))
 }
-fn exec(cmd: &str) -> String {
-    to_string(Command::new(cmd).output().unwrap().stdout)
+
+fn set_short_version(out_dir: &Path, date: &DateTime<Local>, branch: &String, profile: &String) {
+    write!(
+        std::fs::File::create(out_dir.join("version")).expect("Failed to create version file"),
+        "(git@{} {} {}) {}",
+        exec("git", &["log", "-1", "--pretty=format:%h"]).trim(),
+        branch,
+        date.date().to_string(),
+        profile
+    )
+    .unwrap();
+}
+fn set_long_version(out_dir: &Path, date: &DateTime<Local>, branch: &String, profile: &String) {
+    let mut f = std::io::BufWriter::new(
+        std::fs::File::create(out_dir.join("long_version")).expect("Failed to create long version"),
+    );
+    writeln!(&mut f, "{}", profile).unwrap();
+    writeln!(
+        &mut f,
+        "commit: {} git@{}",
+        branch,
+        exec("git", &["log", "-1", "--pretty=format:%H"]).trim()
+    )
+    .unwrap();
+    writeln!(
+        &mut f,
+        "rustc: {} {}",
+        exec(env::var("RUSTC").unwrap().as_str(), &["--version"]).trim(),
+        env::var("TARGET").unwrap()
+    )
+    .unwrap();
+    writeln!(&mut f, "date: {}", date.to_rfc3339().to_string()).unwrap();
+    writeln!(
+        &mut f,
+        "host: {}",
+        launch(&mut Command::new("hostname")).trim()
+    )
+    .unwrap();
+    writeln!(
+        &mut f,
+        r#"submit_rate:
+    submit_delay: {}s
+    get_submisison_delay: {}s,
+    check_delay: {}s"#,
+        SUBMIT_DELAY.as_secs_f32(),
+        SUBMISSION_GET_DELAY.as_secs_f32(),
+        CHECK_DELAY.as_secs_f32()
+    )
+    .unwrap();
+}
+fn get_branch() -> String {
+    let branch = exec("git", &["symbolic-ref", "--short", "-q", "HEAD"]);
+    let trim = branch.trim();
+    if trim.is_empty() {
+        exec("git", &["describe", "--tags", "--exact-match", "HEAD"])
+            .trim()
+            .to_string()
+    } else {
+        trim.to_string()
+    }
 }
 
 fn main() {
-    set_env(
-        "GIT_HASH",
-        exec_args("git", &["log", "-1", "--pretty=format:%H"]).trim(),
-    );
-    {
-        let branch = exec_args("git", &["symbolic-ref", "--short", "-q", "HEAD"]);
-        let trim = branch.trim();
-        if trim.is_empty() {
-            set_env(
-                "GIT_BRANCH",
-                exec_args("git", &["describe", "--tags", "--exact-match", "HEAD"]).trim(),
-            );
-        } else {
-            set_env("GIT_BRANCH", trim);
-        }
-    }
-    set_env("BUILD_TYPE", env::var("PROFILE").unwrap().as_str());
-    set_env("BUILD_HOST", exec("hostname").trim());
-    set_env("BUILD_TIME", Local::now().to_rfc3339().as_str());
-    set_env("CARGO", exec_args("cargo", &["version"]).trim());
-    set_env("RUSTC", exec_args("rustc", &["-V"]).trim());
+    let profile = env::var("PROFILE").unwrap();
+    let buf = env::var("OUT_DIR").unwrap();
+    let out_dir = Path::new(buf.as_str());
+    let branch = get_branch();
+    let time = Local::now();
+    set_short_version(out_dir, &time, &branch, &profile);
+    set_long_version(out_dir, &time, &branch, &profile);
 }

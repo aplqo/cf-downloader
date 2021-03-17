@@ -1,6 +1,8 @@
 [package]
 name = "cf-downloader"
 version = "0.1.0"
+description = "A cli tool for getting codeforces's test data"
+license = "GPL-3.0-or-later"
 authors = ["aplqo <aplqo@outlook.com>"]
 edition = "2018"
 

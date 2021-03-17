@@ -3,7 +3,7 @@ extern crate termcolor;
 
 use cf_downloader::{
     client::{Problem, ProblemType, Session},
-    downloader::{Callback, Downloader, CHECK_DELAY, SUBMISSION_GET_DELAY, SUBMIT_DELAY},
+    downloader::{Callback, Downloader},
     encoding::{
         gzip::Decoder,
         handlebars::{encode::Encoder, meta::Meta},
@@ -11,17 +11,26 @@ use cf_downloader::{
     },
     types::Result,
 };
-use clap::Clap;
+use clap::{crate_description, Clap};
 use std::{
     fs::File,
     io::{stdin, Read, Write},
     path::Path,
-    println, writeln,
 };
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
 
+macro_rules! get_version {
+    ($file:expr) => {
+        concat!(
+            env!("CARGO_PKG_VERSION"),
+            " ",
+            include_str!(concat!(env!("OUT_DIR"), "/", $file))
+        )
+    };
+}
 #[derive(Clap)]
+#[clap(version = get_version!("version"), long_version = get_version!("long_version"), about = crate_description!())]
 struct Login {
     handle: String,
     password: String,
@@ -275,27 +284,8 @@ async fn login(login: Login) -> Result<Session> {
     Ok(ret)
 }
 
-fn print_version() {
-    println!(
-        "{} {} {}",
-        env!("CARGO_PKG_NAME"),
-        env!("CARGO_PKG_VERSION"),
-        env!("BUILD_TYPE")
-    );
-    println!("version: {} git@{}", env!("GIT_BRANCH"), env!("GIT_HASH"));
-    println!("build date: {}", env!("BUILD_TIME"));
-    println!("build on {} with {}", env!("BUILD_HOST"), env!("RUSTC"),);
-    println!(
-        "Submit rate:\n\t submit delay: {}s \n\t get submission delay: {}s \n\t check delay: {}s",
-        SUBMIT_DELAY.as_secs_f32(),
-        SUBMISSION_GET_DELAY.as_secs_f32(),
-        CHECK_DELAY.as_secs_f32()
-    );
-}
-
 #[allow(unused_must_use)]
 fn main() {
-    print_version();
     let rt = Runtime::new().unwrap();
     let mut stdout = StandardStream::stdout(ColorChoice::Auto);
     let info: Login = Login::parse();
