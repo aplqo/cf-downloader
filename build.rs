@@ -53,7 +53,7 @@ fn set_long_version(out_dir: &Path, date: &DateTime<Local>, branch: &String, pro
         &mut f,
         r#"submit_rate:
     submit_delay: {}s
-    get_submisison_delay: {}s,
+    get_submisison_delay: {}s
     check_delay: {}s"#,
         SUBMIT_DELAY.as_secs_f32(),
         SUBMISSION_GET_DELAY.as_secs_f32(),
