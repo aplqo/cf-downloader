@@ -164,7 +164,7 @@ impl<'a> Downloader<'a> {
                     decoder.init(&self.list.data[begin + i]);
                     let mut offset: usize = 0;
                     for s in try_join_all(verdicts.pop_front().unwrap()).await? {
-                        decoder.add_message(offset, s.output.as_str());
+                        decoder.add_message(offset, s.output.trim());
                         offset += BLOCK;
                     }
                     ret.push(decoder.decode()?);
