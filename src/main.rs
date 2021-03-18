@@ -34,7 +34,7 @@ macro_rules! get_version {
 struct Login {
     handle: String,
     password: String,
-    proxy: String,
+    proxy: Option<String>,
 }
 
 fn set_fg(stdout: &mut StandardStream, color: Color) {
@@ -50,7 +50,7 @@ fn reset_fg(stdout: &mut StandardStream) {
 macro_rules! write_color {
     ($dest:expr, $color:expr,$typ:expr,  $($arg:tt)*) => { {
         set_fg($dest, $color);
-        write!($dest,"{:>8}: ", $typ);
+        write!($dest,"{:>7}: ", $typ);
         reset_fg($dest);
         writeln!($dest, $($arg)*).expect("Failed to write output");
     }
@@ -74,6 +74,11 @@ macro_rules! write_ok {
 macro_rules! write_progress {
     ($dest:expr, $typ:expr, $($arg:tt)*) => {
         write_color!($dest, Color::Cyan, $typ, $($arg)*);
+    };
+}
+macro_rules! write_warn {
+    ($dest:expr,$typ:expr, $($arg:tt)*) => {
+       write_color!($dest, Color::Yellow, $typ, $($arg)*);
     };
 }
 
@@ -279,7 +284,7 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
     }
 }
 async fn login(login: Login) -> Result<Session> {
-    let ret = Session::new(login.handle, login.proxy.as_str())?;
+    let ret = Session::new(login.handle, login.proxy)?;
     ret.login(login.password.as_str()).await?;
     Ok(ret)
 }
@@ -289,13 +294,11 @@ fn main() {
     let rt = Runtime::new().unwrap();
     let mut stdout = StandardStream::stdout(ColorChoice::Auto);
     let info: Login = Login::parse();
-    write_info!(
-        &mut stdout,
-        "Info",
-        "Loging into codeforces.com as {} proxy: {}",
-        info.handle,
-        info.proxy
-    );
+    write_info!(&mut stdout, "Info", "Logging in as {}", &info.handle);
+    match &info.proxy {
+        Some(p) => write_info!(&mut stdout, "Info", "Using https proxy: {}", p),
+        None => write_warn!(&mut stdout, "Warn", "No proxy set, ip address is leaked."),
+    };
 
     let session = match rt.block_on(login(info)) {
         Ok(v) => {

@@ -96,10 +96,13 @@ pub struct Session {
     regex: UtilityRegex,
 }
 impl Session {
-    pub fn new(handle: String, proxy: &str) -> Result<Self> {
+    pub fn new(handle: String, proxy: Option<String>) -> Result<Self> {
+        let mut builder = Client::builder();
+        if let Some(p) = proxy {
+            builder = builder.proxy(Proxy::https(p)?);
+        }
         Ok(Session {
-            client: Client::builder()
-                .proxy(Proxy::https(proxy)?)
+            client: builder
                 .user_agent(FIREFOX_UA)
                 .cookie_store(true)
                 .build()
