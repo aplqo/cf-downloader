@@ -10,8 +10,9 @@ object Meta {
     new HashMap[String, Option[String]];
 
   def init(): Unit = {
-    answer.put("12344", Some("123"));
-    answer.put("4321", None);
+    {{#each ignore}}
+    answer.put("{{{this.hash}}}", {{#if this.answer}}Some(raw"""{{{this.answer}}}"""){{else}}None{{/if}});
+    {{/each}}
   }
   def compress(input: String): Array[Byte] = {
     var wdr = new ByteArrayOutputStream();
