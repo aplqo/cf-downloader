@@ -1,12 +1,14 @@
+extern crate rand;
 extern crate regex;
 extern crate reqwest;
 extern crate serde;
 
 use crate::types::{Error, Result};
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use regex::Regex;
 use reqwest::{Client, Proxy};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, result::Result as StdResult};
+use std::{collections::HashMap, iter, result::Result as StdResult};
 
 const MAX_OUTPUT: usize = 500;
 const BFAA: &str = "f1b3f18c715565b589b7823cda7448ce";
@@ -89,6 +91,16 @@ impl UtilityRegex {
         }
     }
 }
+
+fn random_string() -> String {
+    let mut rng = thread_rng();
+    iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .map(char::from)
+        .take(18)
+        .collect()
+}
+
 pub struct Session {
     client: Client,
     handle: String,
@@ -108,7 +120,7 @@ impl Session {
                 .build()
                 .unwrap(),
             handle,
-            ftaa: "123456789123456789".to_string(),
+            ftaa: random_string(),
             regex: UtilityRegex::new(),
         })
     }
@@ -132,7 +144,7 @@ impl Session {
         let body = self
             .client
             .post(URL)
-            .query(&[
+            .form(&[
                 ("csrf_token", csrf.as_str()),
                 ("action", "enter"),
                 ("ftaa", self.ftaa.as_str()),
@@ -188,7 +200,7 @@ impl Session {
         let body = self
             .client
             .post(format!("{}?csrf_token={}", url, csrf))
-            .query(&[
+            .form(&[
                 ("csrf_token", csrf.as_str()),
                 ("ftaa", self.ftaa.as_str()),
                 ("bfaa", BFAA),
