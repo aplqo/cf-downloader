@@ -1,0 +1,35 @@
+name: Autobuild
+trigger:
+  branches:
+    include:
+      - master
+
+stages:
+  - stage: build
+    jobs:
+      - job: 
+        strategy:
+          matrix:
+            windows:
+              name: windows
+              imageName: windows-latest
+              fileName: cf-downloader.exe
+            linux:
+              name: linux
+              imageName: ubuntu-latest
+              fileName: cf-downloader
+
+        pool:
+          vmImage: $(imageName)
+        steps:
+          - checkout: 
+            fetchDepth: 1
+          - script: cargo clippy --release
+            displayName: Run cargo clippy
+          - script: cargo build --release
+            displayName: Run cargo build
+          - script: strip -s $(System.DefaultWorkingDirectory)/target/release/$(fileName)
+            condition: ne(variables['Agent.OS'], 'Windows_NT')
+          - publish: $(System.DefaultWorkingDirectory)/target/release/$(fileName)
+            artifact: cf-downloader-$(Agent.OS)-$(Agent.OSArchitecture)
+            displayName: cf-downloader-$(Agent.OS)-$(Agent.OSArchitecture)
