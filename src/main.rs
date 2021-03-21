@@ -221,7 +221,7 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
     loop {
         match read_line(stdout, prompt.as_bytes()).trim() {
             "get_meta" => {
-                let cnt = read_usize(stdout, b"Count: ", 1, usize::MAX);
+                let cnt = read_usize(stdout, b"Until: ", 0, usize::MAX);
                 let template = read_template(stdout);
                 write_info!(stdout, "Info", "Loading {} more testcase's metadata", cnt);
                 if let Err(e) = rt.block_on(downloader.get_meta::<Meta, _>(

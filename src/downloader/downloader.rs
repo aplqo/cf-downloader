@@ -63,15 +63,19 @@ impl<'a> Downloader<'a> {
     pub async fn get_meta<'b, Enc, F>(
         &mut self,
         template: &Template,
-        count: usize,
+        end: usize,
         mut call: F,
     ) -> Result<()>
     where
         Enc: MetaEncoding<'b>,
         F: Callback,
     {
-        self.list.data.reserve(count);
+        if end < self.len() {
+            return Ok(());
+        }
         let base = self.list.data.len();
+        let count = end - base;
+        self.list.data.reserve(count);
         let mut enc = Enc::new(template, count + base)?;
         unsafe {
             for i in 0..base {
