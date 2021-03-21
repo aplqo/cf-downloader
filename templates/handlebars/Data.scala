@@ -1,3 +1,4 @@
+// {random}
 import java.io._;
 import java.util.Base64;
 import scala.{Some, None};
@@ -34,7 +35,7 @@ object Data {
   def main(args: Array[String]): Unit = {
     init();
     val input = scala.io.Source.fromInputStream(System.in).mkString;
-    var hash = base64Encode(getHash(input));
+    val hash = base64Encode(getHash(input));
     answer.get(hash) match {
       case Some(Some(b)) => print(b);
       case Some(None)    => Solution.Solve(input);
