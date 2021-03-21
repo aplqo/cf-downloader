@@ -18,12 +18,31 @@ pub enum ProblemType {
     Contest,
     Gym,
 }
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Problem {
+    submit_url: String,
+    status_url: String,
     pub source: ProblemType,
     pub contest: String,
     pub id: String,
 }
+impl PartialEq for Problem {
+    fn eq(&self, other: &Self) -> bool {
+        self.source == other.source && self.contest == other.contest && self.id == other.id
+    }
+}
+impl Problem {
+    pub fn new(source: ProblemType, contest: String, id: String) -> Self {
+        Problem {
+            submit_url: format!("https://codeforces.com/contest/{}/submit", contest),
+            status_url: format!("https://codeforces.com/contest/{}/status", contest),
+            source,
+            contest,
+            id,
+        }
+    }
+}
+
 pub struct Verdict {
     pub(crate) input: Option<String>,
     pub(crate) output: String,
@@ -158,11 +177,10 @@ impl Session {
         }
     }
     pub async fn get_last_submission<'a>(&'a self, problem: &Problem) -> Result<Submission<'a>> {
-        let url = format!("https://codeforces.com/contest/{}/status", problem.contest);
-        let csrf = self.get_csrf(url.as_str()).await?;
+        let csrf = self.get_csrf(problem.status_url.as_str()).await?;
         let body = self
             .client
-            .post(url)
+            .post(&problem.status_url)
             .query(&[("order", "BY_ARRIVED_DESC")])
             .form(&[
                 ("csrf_token", csrf.as_str()),
@@ -189,11 +207,11 @@ impl Session {
         }
     }
     pub async fn submit(&self, problem: &Problem, language: &str, code: &str) -> Result<()> {
-        let url = format!("https://codeforces.com/contest/{}/submit", problem.contest);
-        let csrf = self.get_csrf(url.as_str()).await?;
+        let csrf = self.get_csrf(problem.submit_url.as_str()).await?;
         let body = self
             .client
-            .post(format!("{}?csrf_token={}", url, csrf))
+            .post(&problem.submit_url)
+            .query(&[("csrf_token", csrf.as_str())])
             .form(&[
                 ("csrf_token", csrf.as_str()),
                 ("ftaa", self.ftaa.as_str()),
@@ -216,14 +234,15 @@ impl Session {
             None => Ok(()),
         }
     }
-    pub async fn check_exist(&self, problem: &Problem) -> Result<bool> {
-        let url = format!(
-            "https://codeforces.com/contest/{}/problem/{}",
-            problem.contest, problem.id
-        );
+    pub async fn check_exist(
+        &self,
+        _source: ProblemType,
+        contest: &String,
+        id: &String,
+    ) -> Result<bool> {
+        let url = format!("https://codeforces.com/contest/{}/problem/{}", contest, id);
         Ok(url == self.client.get(&url).send().await?.url().as_str())
     }
-
     pub async fn logout(&self) -> Result<()> {
         self.client
             .get("https://codeforces.com/logout")

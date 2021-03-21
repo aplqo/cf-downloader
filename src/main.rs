@@ -130,16 +130,17 @@ fn read_usize(stdout: &mut StandardStream, prompt: &[u8], min: usize, max: usize
 }
 #[allow(unused_must_use)]
 fn read_problem(stdout: &mut StandardStream, session: &Session, rt: &Runtime) -> Problem {
-    let mut ret = Problem {
-        source: ProblemType::Contest,
-        contest: String::new(),
-        id: String::new(),
-    };
+    let mut contest = String::new();
+    let mut id = String::new();
     loop {
-        read_line_to(stdout, b"Contest: ", &mut ret.contest);
-        read_line_to(stdout, b"Problem id: ", &mut ret.id);
-        match rt.block_on(async { session.check_exist(&ret).await }) {
-            Ok(true) => return ret,
+        read_line_to(stdout, b"Contest: ", &mut contest);
+        read_line_to(stdout, b"Problem id: ", &mut id);
+        match rt.block_on(async {
+            session
+                .check_exist(ProblemType::Contest, &contest, &id)
+                .await
+        }) {
+            Ok(true) => return Problem::new(ProblemType::Contest, contest, id),
             Ok(false) => write_error!(stdout, "Error", "No such problem or contest."),
             Err(e) => write_error!(stdout, "Error", "Get problem: {}", e.to_string()),
         }
