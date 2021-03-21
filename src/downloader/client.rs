@@ -105,9 +105,8 @@ impl UtilityRegex {
 }
 
 fn random_string() -> String {
-    let mut rng = thread_rng();
     iter::repeat(())
-        .map(|()| rng.sample(Alphanumeric))
+        .map(|()| thread_rng().sample(Alphanumeric))
         .map(char::from)
         .take(18)
         .collect()
