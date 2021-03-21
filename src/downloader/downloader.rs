@@ -78,6 +78,7 @@ impl<'a> Downloader<'a> {
                 enc.ignore(&(*self.list.data.as_ptr().add(i)).data_id);
             }
         }
+        enc.init();
         let mut next = Instant::now();
         for i in 0..count {
             sleep_until(next).await;
@@ -131,6 +132,7 @@ impl<'a> Downloader<'a> {
             for i in &self.list.data[0..begin] {
                 encoder.push_ignore(&i.data_id);
             }
+            encoder.init();
             for (ind, i) in self.list.data[begin..end].into_iter().enumerate() {
                 let mut cur = VecDeque::new();
                 if let None = &i.input {

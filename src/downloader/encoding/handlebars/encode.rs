@@ -1,7 +1,7 @@
 extern crate serde;
 
 use crate::{
-    encoding::{traits, Template},
+    encoding::{traits, utility::random, Template},
     types::{DataId, Result, BLOCK},
 };
 use handlebars::Handlebars;
@@ -10,6 +10,7 @@ use std::vec::Vec;
 
 #[derive(Serialize)]
 struct EncParam<'a> {
+    random: u64,
     length: usize,
     offset: usize,
     ignore: Vec<&'a DataId>,
@@ -25,6 +26,7 @@ impl<'a> traits::DataEncoder<'a> for Encoder<'a> {
         let mut ret = Encoder {
             result: String::new(),
             param: EncParam {
+                random: 0,
                 length: BLOCK,
                 offset: 0,
                 ignore: Vec::new(),
@@ -35,6 +37,9 @@ impl<'a> traits::DataEncoder<'a> for Encoder<'a> {
         ret.engine
             .register_template_string("code", template.content.as_str())?;
         Ok(ret)
+    }
+    fn init(&mut self) {
+        self.param.random = random();
     }
     fn push_ignore(&mut self, hash: &'a DataId) {
         self.param.ignore.push(hash);

@@ -2,7 +2,7 @@ extern crate serde;
 
 use crate::{
     client::Verdict,
-    encoding::{traits, Template},
+    encoding::{traits, utility::random, Template},
     types::{DataId, Result, TestMeta},
 };
 use handlebars::Handlebars;
@@ -10,6 +10,7 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 struct MetaParam<'a> {
+    random: u64,
     ignore: Vec<&'a DataId>,
 }
 pub struct Meta<'a> {
@@ -22,13 +23,19 @@ impl<'a> traits::MetaEncoding<'a> for Meta<'a> {
     fn new(template: &Template, max: usize) -> Result<Self> {
         let mut ret = Meta {
             result: String::new(),
-            param: MetaParam { ignore: Vec::new() },
+            param: MetaParam {
+                random: 0,
+                ignore: Vec::new(),
+            },
             engine: Handlebars::new(),
         };
         ret.param.ignore.reserve(max);
         ret.engine
             .register_template_string("code", template.content.as_str())?;
         Ok(ret)
+    }
+    fn init(&mut self) {
+        self.param.random = random();
     }
     fn ignore(&mut self, hash: &'a DataId) {
         self.param.ignore.push(hash);
