@@ -12,7 +12,7 @@ fn exec<I: std::iter::IntoIterator<Item = impl AsRef<std::ffi::OsStr>>>(
     launch(Command::new(cmd).args(args))
 }
 
-fn set_short_version(out_dir: &Path, date: &DateTime<Local>, branch: &String, profile: &String) {
+fn set_short_version(out_dir: &Path, date: &DateTime<Local>, branch: &str, profile: &str) {
     write!(
         std::fs::File::create(out_dir.join("version")).expect("Failed to create version file"),
         "(git@{} {} {}) {}",
@@ -23,7 +23,7 @@ fn set_short_version(out_dir: &Path, date: &DateTime<Local>, branch: &String, pr
     )
     .unwrap();
 }
-fn set_long_version(out_dir: &Path, date: &DateTime<Local>, branch: &String, profile: &String) {
+fn set_long_version(out_dir: &Path, date: &DateTime<Local>, branch: &str, profile: &str) {
     let mut f = std::io::BufWriter::new(
         std::fs::File::create(out_dir.join("long_version")).expect("Failed to create long version"),
     );
@@ -42,7 +42,7 @@ fn set_long_version(out_dir: &Path, date: &DateTime<Local>, branch: &String, pro
         env::var("TARGET").unwrap()
     )
     .unwrap();
-    writeln!(&mut f, "date: {}", date.to_rfc3339().to_string()).unwrap();
+    writeln!(&mut f, "date: {}", date.to_rfc3339()).unwrap();
     writeln!(
         &mut f,
         "host: {}",

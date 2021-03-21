@@ -175,7 +175,7 @@ impl Session {
             Err(Error::new("Failed to log into codeforces.com".to_string()))
         }
     }
-    pub async fn get_last_submission<'a>(&'a self, problem: &Problem) -> Result<Submission<'a>> {
+    pub async fn get_last_submission(&self, problem: &Problem) -> Result<Submission<'_>> {
         let csrf = self.get_csrf(problem.status_url.as_str()).await?;
         let body = self
             .client
@@ -236,8 +236,8 @@ impl Session {
     pub async fn check_exist(
         &self,
         _source: ProblemType,
-        contest: &String,
-        id: &String,
+        contest: &str,
+        id: &str,
     ) -> Result<bool> {
         let url = format!("https://codeforces.com/contest/{}/problem/{}", contest, id);
         Ok(url == self.client.get(&url).send().await?.url().as_str())

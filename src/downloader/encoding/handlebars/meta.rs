@@ -47,11 +47,11 @@ impl<'a> traits::MetaEncoding<'a> for Meta<'a> {
     fn decode(message: Verdict) -> Result<TestMeta> {
         let mut p = message.output.split_whitespace();
         Ok(TestMeta {
-            size: p.nth(0).ok_or("Can't find size")?.parse()?,
-            output_size: p.nth(0).ok_or("Can't find output size")?.parse()?,
-            compress_size: p.nth(0).ok_or("Can't find compressed size")?.parse()?,
+            size: p.next().ok_or("Can't find size")?.parse()?,
+            output_size: p.next().ok_or("Can't find output size")?.parse()?,
+            compress_size: p.next().ok_or("Can't find compressed size")?.parse()?,
             data_id: DataId {
-                hash: p.nth(0).ok_or("Can't get input hash")?.to_string(),
+                hash: p.next().ok_or("Can't get input hash")?.to_string(),
                 answer: message.answer,
             },
             input: message.input,

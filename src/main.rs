@@ -101,7 +101,7 @@ fn read_line_to(stdout: &mut StandardStream, prompt: &[u8], dest: &mut String) {
 fn read_line(stdout: &mut StandardStream, prompt: &[u8]) -> String {
     let mut ret = String::new();
     read_line_to(stdout, prompt, &mut ret);
-    return ret;
+    ret
 }
 #[allow(unused_must_use)]
 fn read_usize(stdout: &mut StandardStream, prompt: &[u8], min: usize, max: usize) -> usize {
@@ -158,7 +158,7 @@ fn read_template(stdout: &mut StandardStream) -> Template {
             Ok(_) => {
                 return Template {
                     language: lang,
-                    content: content,
+                    content,
                 };
             }
             Err(e) => write_error!(stdout, "Error", "read file: {}", e.to_string()),

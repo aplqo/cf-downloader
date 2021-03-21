@@ -52,10 +52,8 @@ impl<'a> Downloader<'a> {
             },
         }
     }
-    async fn submit_code(&'a self, lang: &String, code: &String) -> Result<Submission<'a>> {
-        self.session
-            .submit(&self.list.problem, lang.as_str(), code.as_str())
-            .await?;
+    async fn submit_code(&'a self, lang: &str, code: &str) -> Result<Submission<'a>> {
+        self.session.submit(&self.list.problem, lang, code).await?;
         sleep(SUBMISSION_GET_DELAY).await;
         self.session.get_last_submission(&self.list.problem).await
     }
@@ -109,7 +107,8 @@ impl<'a> Downloader<'a> {
                 self.list.problem, lst.problem
             )));
         }
-        Ok(self.list = lst)
+        self.list = lst;
+        Ok(())
     }
     pub fn save_meta(&self, dest: &path::Path) -> Result<()> {
         Ok(serde_yaml::to_writer(File::create(dest)?, &self.list)?)
@@ -136,9 +135,9 @@ impl<'a> Downloader<'a> {
                 encoder.push_ignore(&i.data_id);
             }
             encoder.init();
-            for (ind, i) in self.list.data[begin..end].into_iter().enumerate() {
+            for (ind, i) in self.list.data[begin..end].iter().enumerate() {
                 let mut cur = Vec::new();
-                if let None = &i.input {
+                if i.input.is_none() {
                     call.on_case_begin(ind + begin);
                     let count = (i.output_size + BLOCK - 1) / BLOCK;
                     cur.reserve(count);
@@ -161,14 +160,14 @@ impl<'a> Downloader<'a> {
         ret.reserve(length);
         {
             let mut decoder = Dec::new();
-            for i in 0..length {
+            for (i, it) in verdicts.iter().enumerate() {
                 call.on_case_end(i + begin);
                 if let Some(p) = &self.list.data[begin + i].input {
                     ret.push(p.clone());
                 } else {
                     decoder.init(&self.list.data[begin + i]);
                     let mut offset: usize = 0;
-                    for s in &verdicts[i] {
+                    for s in it {
                         decoder
                             .add_message(offset, s.wait_judge(i + begin + 1).await?.output.trim());
                         offset += BLOCK;
