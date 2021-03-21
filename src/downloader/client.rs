@@ -9,7 +9,6 @@ use regex::Regex;
 use reqwest::{Client, Proxy};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, iter, result::Result as StdResult};
-
 const MAX_OUTPUT: usize = 500;
 const BFAA: &str = "f1b3f18c715565b589b7823cda7448ce";
 const FIREFOX_UA: &str = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0";
@@ -31,48 +30,42 @@ pub struct Verdict {
     pub(crate) answer: Option<String>,
 }
 
-pub struct Submission {
+pub struct Submission<'a> {
+    session: &'a Session,
     id: String,
     csrf_token: String,
 }
-fn full_data_or(data: String) -> Option<String> {
-    if data.len() > MAX_OUTPUT {
-        None
-    } else {
-        Some(data)
+impl<'a> Submission<'a> {
+    fn full_data_or(data: String) -> Option<String> {
+        if data.len() > MAX_OUTPUT {
+            None
+        } else {
+            Some(data)
+        }
     }
-}
-impl Submission {
-    async fn get_info(
-        &self,
-        session: &Session,
-    ) -> StdResult<HashMap<String, String>, reqwest::Error> {
-        session
+    pub async fn poll(&self, id: usize) -> Result<Option<Verdict>> {
+        let mut data = self
+            .session
             .client
             .post("https://codeforces.com/data/submitSource")
             .form(&[("submissionId", &self.id), ("csrf_token", &self.csrf_token)])
             .send()
             .await?
             .json::<HashMap<String, String>>()
-            .await
-    }
-    pub async fn is_judged(&self, session: &Session) -> bool {
-        self.get_info(session).await.map_or(false, |v| {
-            let p = &v["verdict"];
-            !p.contains("verdict-waiting")
-        })
-    }
-    pub async fn get_verdict(&self, session: &Session, id: usize) -> Result<Verdict> {
-        let mut data = self.get_info(session).await?;
-        let pos = data.remove("testCount").unwrap();
-        if pos.parse::<usize>().unwrap() != id {
-            return Err(Error::new(String::from("Test count not expected")));
+            .await?;
+        if data["verdict"].contains("verdict-waiting") {
+            return Ok(None);
+        } else {
+            let pos = data.remove("testCount").unwrap();
+            if pos.parse::<usize>().unwrap() != id {
+                return Err(Error::new(String::from("Test count not expected")));
+            }
+            return Ok(Some(Verdict {
+                input: Self::full_data_or(data.remove(&format!("input#{}", pos)).unwrap()),
+                output: data.remove(&format!("output#{}", pos)).unwrap(),
+                answer: Self::full_data_or(data.remove(&format!("answer#{}", pos)).unwrap()),
+            }));
         }
-        Ok(Verdict {
-            input: full_data_or(data.remove(&format!("input#{}", pos)).unwrap()),
-            output: data.remove(&format!("output#{}", pos)).unwrap(),
-            answer: full_data_or(data.remove(&format!("answer#{}", pos)).unwrap()),
-        })
     }
 }
 struct UtilityRegex {
@@ -164,7 +157,7 @@ impl Session {
             Err(Error::new("Failed to log into codeforces.com".to_string()))
         }
     }
-    pub async fn get_last_submission(&self, problem: &Problem) -> Result<Submission> {
+    pub async fn get_last_submission<'a>(&'a self, problem: &Problem) -> Result<Submission<'a>> {
         let url = format!("https://codeforces.com/contest/{}/status", problem.contest);
         let csrf = self.get_csrf(url.as_str()).await?;
         let body = self
@@ -188,6 +181,7 @@ impl Session {
             .await?;
         match self.regex.last_submit.captures(body.as_str()) {
             Some(id) => Ok(Submission {
+                session: self,
                 id: id.get(1).unwrap().as_str().to_string(),
                 csrf_token: csrf,
             }),

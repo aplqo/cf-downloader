@@ -8,11 +8,10 @@ use crate::{
     },
     types::{Error, Result, TestMeta, BLOCK},
 };
-use futures::future::try_join_all;
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, fs::File, path, time::Duration, vec::Vec};
+use std::{fs::File, path, time::Duration, vec::Vec};
 use tokio::time::{sleep, sleep_until, Instant};
-const UPDATE_RATE: usize = 7;
+const UPDATE_RATE: usize = 3;
 include!("./delay.rs");
 
 #[derive(Serialize, Deserialize)]
@@ -31,14 +30,15 @@ pub trait Callback {
     fn on_progress(&mut self, _id: usize, _current: usize, _total: usize) {}
 }
 
-impl Submission {
-    async fn wait_judge<'a>(self, session: &'a Session, id: usize) -> Result<Verdict> {
+impl<'a> Submission<'a> {
+    async fn wait_judge(&self, id: usize) -> Result<Verdict> {
         let mut next = Instant::now();
-        while !self.is_judged(session).await {
+        loop {
+            if let Some(v) = self.poll(id).await? {
+                return Ok(v);
+            }
             next += CHECK_DELAY;
-            sleep_until(next).await;
         }
-        self.get_verdict(session, id).await
     }
 }
 
@@ -52,7 +52,7 @@ impl<'a> Downloader<'a> {
             },
         }
     }
-    async fn submit_code(&self, lang: &String, code: &String) -> Result<Submission> {
+    async fn submit_code(&'a self, lang: &String, code: &String) -> Result<Submission<'a>> {
         self.session
             .submit(&self.list.problem, lang.as_str(), code.as_str())
             .await?;
@@ -86,7 +86,7 @@ impl<'a> Downloader<'a> {
             self.list.data.push(Enc::decode(
                 self.submit_code(&template.language, enc.generate()?)
                     .await?
-                    .wait_judge(&self.session, base + i + 1)
+                    .wait_judge(base + i + 1)
                     .await?,
             )?);
             next += SUBMIT_DELAY;
@@ -123,8 +123,7 @@ impl<'a> Downloader<'a> {
         F: Callback,
     {
         let length = end - begin;
-        let mut ret: Vec<String> = Vec::new();
-        let mut verdicts = VecDeque::new();
+        let mut verdicts = Vec::new();
         verdicts.reserve(length);
         {
             let mut encoder = Enc::new(template, end)?;
@@ -134,16 +133,15 @@ impl<'a> Downloader<'a> {
             }
             encoder.init();
             for (ind, i) in self.list.data[begin..end].into_iter().enumerate() {
-                let mut cur = VecDeque::new();
+                let mut cur = Vec::new();
                 if let None = &i.input {
                     call.on_case_begin(ind + begin);
                     let count = (i.output_size + BLOCK - 1) / BLOCK;
                     cur.reserve(count);
                     for j in 0..count {
-                        cur.push_back(
+                        cur.push(
                             self.submit_code(&template.language, encoder.generate(j * BLOCK)?)
-                                .await?
-                                .wait_judge(&self.session, ind + begin + 1),
+                                .await?,
                         );
                         next += SUBMIT_DELAY;
                         if j & UPDATE_RATE == 0 {
@@ -152,9 +150,10 @@ impl<'a> Downloader<'a> {
                     }
                 }
                 encoder.push_ignore(&i.data_id);
-                verdicts.push_back(cur);
+                verdicts.push(cur);
             }
         }
+        let mut ret: Vec<String> = Vec::new();
         ret.reserve(length);
         {
             let mut decoder = Dec::new();
@@ -165,8 +164,9 @@ impl<'a> Downloader<'a> {
                 } else {
                     decoder.init(&self.list.data[begin + i]);
                     let mut offset: usize = 0;
-                    for s in try_join_all(verdicts.pop_front().unwrap()).await? {
-                        decoder.add_message(offset, s.output.trim());
+                    for s in &verdicts[i] {
+                        decoder
+                            .add_message(offset, s.wait_judge(i + begin + 1).await?.output.trim());
                         offset += BLOCK;
                     }
                     ret.push(decoder.decode()?);
