@@ -22,8 +22,6 @@ stages:
         pool:
           vmImage: $(imageName)
         steps:
-          - checkout: 
-            fetchDepth: 1
           - script: cargo clippy --release
             displayName: Run cargo clippy
           - script: cargo build --release
