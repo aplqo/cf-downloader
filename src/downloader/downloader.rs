@@ -34,6 +34,7 @@ impl<'a> Submission<'a> {
     async fn wait_judge(&self, id: usize) -> Result<Verdict> {
         let mut next = Instant::now();
         loop {
+            sleep_until(next).await;
             if let Some(v) = self.poll(id).await? {
                 return Ok(v);
             }
