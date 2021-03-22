@@ -1,7 +1,7 @@
 extern crate serde;
 
 use crate::{
-    client::Verdict,
+    client::verdict::Verdict,
     encoding::{traits, utility::random, Template},
     types::{DataId, Result, TestMeta},
 };

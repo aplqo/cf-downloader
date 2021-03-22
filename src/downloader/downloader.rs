@@ -1,7 +1,7 @@
 extern crate serde;
 
 use crate::{
-    client::{Problem, Session, Submission, Verdict},
+    client::{problem::Problem, session::Session, submission::Submission, verdict::Verdict},
     encoding::{
         traits::{DataDecoder, DataEncoder, MetaEncoding},
         Template,

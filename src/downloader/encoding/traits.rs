@@ -1,5 +1,5 @@
 use crate::{
-    client::Verdict,
+    client::verdict::Verdict,
     encoding::Template,
     types::{DataId, Result, TestMeta},
 };

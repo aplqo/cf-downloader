@@ -2,7 +2,10 @@ extern crate clap;
 extern crate termcolor;
 
 use cf_downloader::{
-    client::{Problem, ProblemType, Session},
+    client::{
+        problem::{Problem, Type},
+        session::Session,
+    },
     downloader::{Callback, Downloader},
     encoding::{
         gzip::Decoder,
@@ -135,12 +138,8 @@ fn read_problem(stdout: &mut StandardStream, session: &Session, rt: &Runtime) ->
     loop {
         read_line_to(stdout, b"Contest: ", &mut contest);
         read_line_to(stdout, b"Problem id: ", &mut id);
-        match rt.block_on(async {
-            session
-                .check_exist(ProblemType::Contest, &contest, &id)
-                .await
-        }) {
-            Ok(true) => return Problem::new(ProblemType::Contest, contest, id),
+        match rt.block_on(async { session.check_exist(Type::Contest, &contest, &id).await }) {
+            Ok(true) => return Problem::new(Type::Contest, contest, id),
             Ok(false) => write_error!(stdout, "Error", "No such problem or contest."),
             Err(e) => write_error!(stdout, "Error", "Get problem: {}", e.to_string()),
         }
