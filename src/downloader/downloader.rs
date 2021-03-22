@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::{fs::File, path, time::Duration, vec::Vec};
 use tokio::time::{sleep, sleep_until, Instant};
 const UPDATE_RATE: usize = 3;
-include!("./delay.rs");
+include!("./config/delay.rs");
 
 #[derive(Serialize, Deserialize)]
 struct DataList {

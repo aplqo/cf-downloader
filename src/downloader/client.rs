@@ -12,6 +12,7 @@ use std::{collections::HashMap, iter, result::Result as StdResult};
 const MAX_OUTPUT: usize = 500;
 const BFAA: &str = "f1b3f18c715565b589b7823cda7448ce";
 const FIREFOX_UA: &str = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0";
+include!("./config/retry.rs");
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum ProblemType {
@@ -43,6 +44,23 @@ impl Problem {
     }
 }
 
+async fn async_retry<'a, F, U, E: 'static, Out>(fun: F) -> Result<Out>
+where
+    F: Fn() -> U,
+    E: std::error::Error,
+    U: core::future::Future<Output = StdResult<Out, E>>,
+{
+    for _i in 0..RETRY - 1 {
+        if let Ok(v) = fun().await {
+            return Ok(v);
+        }
+    }
+    match fun().await {
+        Ok(v) => Ok(v),
+        Err(e) => Err(Box::new(e)),
+    }
+}
+
 pub struct Verdict {
     pub(crate) input: Option<String>,
     pub(crate) output: String,
@@ -63,15 +81,17 @@ impl<'a> Submission<'a> {
         }
     }
     pub async fn poll(&self, id: usize) -> Result<Option<Verdict>> {
-        let mut data = self
-            .session
-            .client
-            .post("https://codeforces.com/data/submitSource")
-            .form(&[("submissionId", &self.id), ("csrf_token", &self.csrf_token)])
-            .send()
-            .await?
-            .json::<HashMap<String, String>>()
-            .await?;
+        let mut data = async_retry(async || {
+            self.session
+                .client
+                .post("https://codeforces.com/data/submitSource")
+                .form(&[("submissionId", &self.id), ("csrf_token", &self.csrf_token)])
+                .send()
+                .await?
+                .json::<HashMap<String, String>>()
+                .await
+        })
+        .await?;
         if data["verdict"].contains("verdict-waiting") {
             return Ok(None);
         } else {
@@ -136,8 +156,8 @@ impl Session {
         })
     }
 
-    async fn get_csrf(&self, url: &str) -> StdResult<String, reqwest::Error> {
-        let body = self.client.get(url).send().await?.text().await?;
+    async fn get_csrf(&self, url: &str) -> Result<String> {
+        let body = async_retry(async || self.client.get(url).send().await?.text().await).await?;
         Ok(self
             .regex
             .csrf
@@ -152,23 +172,25 @@ impl Session {
     pub async fn login(&self, password: &str) -> Result<()> {
         const URL: &str = "https://codeforces.com/enter";
         let csrf = self.get_csrf(URL).await?;
-        let body = self
-            .client
-            .post(URL)
-            .form(&[
-                ("csrf_token", csrf.as_str()),
-                ("action", "enter"),
-                ("ftaa", self.ftaa.as_str()),
-                ("bfaa", BFAA),
-                ("handleOrEmail", self.handle.as_str()),
-                ("password", password),
-                ("_tta", "176"),
-                ("remember", "off"),
-            ])
-            .send()
-            .await?
-            .text()
-            .await?;
+        let body = async_retry(async || {
+            self.client
+                .post(URL)
+                .form(&[
+                    ("csrf_token", csrf.as_str()),
+                    ("action", "enter"),
+                    ("ftaa", self.ftaa.as_str()),
+                    ("bfaa", BFAA),
+                    ("handleOrEmail", self.handle.as_str()),
+                    ("password", password),
+                    ("_tta", "176"),
+                    ("remember", "off"),
+                ])
+                .send()
+                .await?
+                .text()
+                .await
+        })
+        .await?;
         if self.regex.login.is_match(body.as_str()) {
             Ok(())
         } else {
@@ -177,25 +199,27 @@ impl Session {
     }
     pub async fn get_last_submission(&self, problem: &Problem) -> Result<Submission<'_>> {
         let csrf = self.get_csrf(problem.status_url.as_str()).await?;
-        let body = self
-            .client
-            .post(&problem.status_url)
-            .query(&[("order", "BY_ARRIVED_DESC")])
-            .form(&[
-                ("csrf_token", csrf.as_str()),
-                ("action", "setupSubmissionFilter"),
-                ("frameProblemIndex", problem.id.as_str()),
-                ("verdictName", "anyVerdict"),
-                ("programTypeForInvoker", "anyProgramTypeForInvoker"),
-                ("comparisonType", "NOT_USED"),
-                ("judgedTestCount", ""),
-                ("participantSubstring", self.handle.as_str()),
-                ("_tta", "54"),
-            ])
-            .send()
-            .await?
-            .text()
-            .await?;
+        let body = async_retry(async || {
+            self.client
+                .post(&problem.status_url)
+                .query(&[("order", "BY_ARRIVED_DESC")])
+                .form(&[
+                    ("csrf_token", csrf.as_str()),
+                    ("action", "setupSubmissionFilter"),
+                    ("frameProblemIndex", problem.id.as_str()),
+                    ("verdictName", "anyVerdict"),
+                    ("programTypeForInvoker", "anyProgramTypeForInvoker"),
+                    ("comparisonType", "NOT_USED"),
+                    ("judgedTestCount", ""),
+                    ("participantSubstring", self.handle.as_str()),
+                    ("_tta", "54"),
+                ])
+                .send()
+                .await?
+                .text()
+                .await
+        })
+        .await?;
         match self.regex.last_submit.captures(body.as_str()) {
             Some(id) => Ok(Submission {
                 session: self,
@@ -207,38 +231,35 @@ impl Session {
     }
     pub async fn submit(&self, problem: &Problem, language: &str, code: &str) -> Result<()> {
         let csrf = self.get_csrf(problem.submit_url.as_str()).await?;
-        let body = self
-            .client
-            .post(&problem.submit_url)
-            .query(&[("csrf_token", csrf.as_str())])
-            .form(&[
-                ("csrf_token", csrf.as_str()),
-                ("ftaa", self.ftaa.as_str()),
-                ("bfaa", BFAA),
-                ("action", "submitSolutionFormSubmitted"),
-                ("submittedProblemIndex", problem.id.as_str()),
-                ("programTypeId", language),
-                ("contestId", problem.contest.as_str()),
-                ("source", code),
-                ("tabSize", "4"),
-                ("_tta", "594"),
-                ("sourceCodeConfirmed", "true"),
-            ])
-            .send()
-            .await?
-            .text()
-            .await?;
+        let body = async_retry(async || {
+            self.client
+                .post(&problem.submit_url)
+                .query(&[("csrf_token", csrf.as_str())])
+                .form(&[
+                    ("csrf_token", csrf.as_str()),
+                    ("ftaa", self.ftaa.as_str()),
+                    ("bfaa", BFAA),
+                    ("action", "submitSolutionFormSubmitted"),
+                    ("submittedProblemIndex", problem.id.as_str()),
+                    ("programTypeId", language),
+                    ("contestId", problem.contest.as_str()),
+                    ("source", code),
+                    ("tabSize", "4"),
+                    ("_tta", "594"),
+                    ("sourceCodeConfirmed", "true"),
+                ])
+                .send()
+                .await?
+                .text()
+                .await
+        })
+        .await?;
         match self.regex.submit.captures(body.as_str()) {
             Some(err) => Err(Error::new(err.get(1).unwrap().as_str().to_string())),
             None => Ok(()),
         }
     }
-    pub async fn check_exist(
-        &self,
-        _source: ProblemType,
-        contest: &str,
-        id: &str,
-    ) -> Result<bool> {
+    pub async fn check_exist(&self, _source: ProblemType, contest: &str, id: &str) -> Result<bool> {
         let url = format!("https://codeforces.com/contest/{}/problem/{}", contest, id);
         Ok(url == self.client.get(&url).send().await?.url().as_str())
     }

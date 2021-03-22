@@ -1,6 +1,7 @@
 use chrono::{DateTime, Local};
 use std::{env, io::Write, path::Path, process::Command, time::Duration};
-include!("./src/downloader/delay.rs");
+include!("./src/downloader/config/delay.rs");
+include!("./src/downloader/config/retry.rs");
 
 fn launch(cmd: &mut Command) -> String {
     String::from_utf8(cmd.output().unwrap().stdout).unwrap()
@@ -60,6 +61,7 @@ fn set_long_version(out_dir: &Path, date: &DateTime<Local>, branch: &str, profil
         CHECK_DELAY.as_secs_f32()
     )
     .unwrap();
+    writeln!(&mut f, "retry_count: {}", RETRY).unwrap();
 }
 fn get_branch() -> String {
     let branch = exec("git", &["symbolic-ref", "--short", "-q", "HEAD"]);
