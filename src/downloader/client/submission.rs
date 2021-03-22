@@ -27,6 +27,7 @@ impl<'a> Submission<'a> {
                 .form(&[("submissionId", &self.id), ("csrf_token", &self.csrf_token)])
                 .send()
                 .await?
+                .error_for_status()?
                 .json::<HashMap<String, String>>()
                 .await
         })

@@ -66,7 +66,16 @@ impl Session {
     }
 
     async fn get_csrf(&self, url: &str) -> Result<String> {
-        let body = async_retry(async || self.client.get(url).send().await?.text().await).await?;
+        let body = async_retry(async || {
+            self.client
+                .get(url)
+                .send()
+                .await?
+                .error_for_status()?
+                .text()
+                .await
+        })
+        .await?;
         Ok(self
             .regex
             .csrf
@@ -96,6 +105,7 @@ impl Session {
                 ])
                 .send()
                 .await?
+                .error_for_status()?
                 .text()
                 .await
         })
@@ -125,6 +135,7 @@ impl Session {
                 ])
                 .send()
                 .await?
+                .error_for_status()?
                 .text()
                 .await
         })
@@ -159,6 +170,7 @@ impl Session {
                 ])
                 .send()
                 .await?
+                .error_for_status()?
                 .text()
                 .await
         })
@@ -170,13 +182,22 @@ impl Session {
     }
     pub async fn check_exist(&self, source: Type, contest: &str, id: &str) -> Result<bool> {
         let url = get_problem_url(source, contest, id);
-        Ok(url == self.client.get(&url).send().await?.url().as_str())
+        Ok(url
+            == self
+                .client
+                .get(&url)
+                .send()
+                .await?
+                .error_for_status()?
+                .url()
+                .as_str())
     }
     pub async fn logout(&self) -> Result<()> {
         self.client
             .get("https://codeforces.com/logout")
             .send()
-            .await?;
+            .await?
+            .error_for_status()?;
         Ok(())
     }
 }
