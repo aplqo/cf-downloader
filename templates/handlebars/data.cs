@@ -1,4 +1,4 @@
-// id: {random}
+// id: {{random}}
 using System;
 using System.Text;
 using System.IO;
