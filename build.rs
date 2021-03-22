@@ -61,7 +61,15 @@ fn set_long_version(out_dir: &Path, date: &DateTime<Local>, branch: &str, profil
         CHECK_DELAY.as_secs_f32()
     )
     .unwrap();
-    writeln!(&mut f, "retry_count: {}", RETRY).unwrap();
+    writeln!(
+        &mut f,
+        r#"retry:
+    delay: {}s
+    count: {}"#,
+        RETRY_DELAY.as_secs_f32(),
+        RETRY_COUNT
+    )
+    .unwrap();
 }
 fn get_branch() -> String {
     let branch = exec("git", &["symbolic-ref", "--short", "-q", "HEAD"]);
