@@ -22,7 +22,7 @@ stages:
         pool:
           vmImage: $(imageName)
         steps:
-          - script: rustup default nightly
+          - script: rustup default nightly && rustup component add clippy
             displayName: select nightly rustc
           - script: cargo clippy --release
             displayName: Run cargo clippy
