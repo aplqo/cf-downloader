@@ -7,7 +7,7 @@ trigger:
 stages:
   - stage: build
     jobs:
-      - job: 
+      - job:
         strategy:
           matrix:
             windows:
@@ -22,12 +22,15 @@ stages:
         pool:
           vmImage: $(imageName)
         steps:
+          - script: rustup default nightly
+            displayName: select nightly rustc
           - script: cargo clippy --release
             displayName: Run cargo clippy
           - script: cargo build --release
             displayName: Run cargo build
           - script: strip -s $(System.DefaultWorkingDirectory)/target/release/$(fileName)
             condition: ne(variables['Agent.OS'], 'Windows_NT')
+            displayName: Strip output file
           - publish: $(System.DefaultWorkingDirectory)/target/release/$(fileName)
             artifact: cf-downloader-$(Agent.OS)-$(Agent.OSArchitecture)
             displayName: cf-downloader-$(Agent.OS)-$(Agent.OSArchitecture)
