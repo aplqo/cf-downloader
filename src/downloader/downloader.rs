@@ -166,11 +166,8 @@ impl<'a> Downloader<'a> {
                     ret.push(p.clone());
                 } else {
                     decoder.init(&self.list.data[begin + i]);
-                    let mut offset: usize = 0;
                     for s in it {
-                        decoder
-                            .add_message(offset, s.wait_judge(i + begin + 1).await?.output.trim());
-                        offset += BLOCK;
+                        decoder.append_message(s.wait_judge(i + begin + 1).await?.output.trim());
                     }
                     ret.push(decoder.decode()?);
                     decoder.clear();

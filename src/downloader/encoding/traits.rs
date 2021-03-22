@@ -23,7 +23,7 @@ pub trait DataEncoder<'a>: Sized {
 pub trait DataDecoder: Sized {
     fn new() -> Self;
     fn init(&mut self, test: &TestMeta);
-    fn add_message(&mut self, offset: usize, message: &str);
+    fn append_message(&mut self, message: &str);
     fn clear(&mut self);
     fn decode(&mut self) -> Result<String>;
 }
