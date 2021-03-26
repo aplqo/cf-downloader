@@ -87,7 +87,7 @@ impl<'a> Downloader<'a> {
             sleep_until(next).await;
             call.on_case_begin(i + base);
             self.list.data.push(Enc::decode(
-                self.submit_code(&template.language, enc.generate()?)
+                self.submit_code(&template.language, enc.generate()?.as_str())
                     .await?
                     .wait_judge(base + i + 1)
                     .await?,
@@ -144,8 +144,11 @@ impl<'a> Downloader<'a> {
                     cur.reserve(count);
                     for j in 0..count {
                         cur.push(
-                            self.submit_code(&template.language, encoder.generate(j * BLOCK)?)
-                                .await?,
+                            self.submit_code(
+                                &template.language,
+                                encoder.generate(j * BLOCK)?.as_str(),
+                            )
+                            .await?,
                         );
                         next += SUBMIT_DELAY;
                         if j & UPDATE_RATE == 0 {

@@ -14,7 +14,6 @@ struct MetaParam<'a> {
     ignore: Vec<&'a DataId>,
 }
 pub struct Meta<'a> {
-    result: String,
     param: MetaParam<'a>,
     engine: Handlebars<'a>,
 }
@@ -22,7 +21,6 @@ pub struct Meta<'a> {
 impl<'a> traits::MetaEncoding<'a> for Meta<'a> {
     fn new(template: &Template, max: usize) -> Result<Self> {
         let mut ret = Meta {
-            result: String::new(),
             param: MetaParam {
                 random: 0,
                 ignore: Vec::new(),
@@ -40,9 +38,8 @@ impl<'a> traits::MetaEncoding<'a> for Meta<'a> {
     fn ignore(&mut self, hash: &'a DataId) {
         self.param.ignore.push(hash);
     }
-    fn generate(&mut self) -> Result<&String> {
-        self.result = self.engine.render("code", &self.param)?;
-        Ok(&self.result)
+    fn generate(&self) -> Result<String> {
+        Ok(self.engine.render("code", &self.param)?)
     }
     fn decode(message: Verdict) -> Result<TestMeta> {
         let mut p = message.output.split_whitespace();
