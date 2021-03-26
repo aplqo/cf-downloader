@@ -21,6 +21,7 @@ struct UtilityRegex {
     login: Regex,
     submit: Regex,
     last_submit: Regex,
+    logout: Regex,
 }
 impl UtilityRegex {
     fn new() -> Self {
@@ -29,6 +30,7 @@ impl UtilityRegex {
             login: Regex::new(r#"handle = "[[:word:]]+"#).unwrap(),
             submit: Regex::new(r#"error[a-zA-Z_\-\\ ]*">(.*)</span>"#).unwrap(),
             last_submit: Regex::new(r#"data-submission-id="([[:digit:]]+)""#).unwrap(),
+            logout: Regex::new(r#"<a href="/([[:xdigit:]]+)/logout""#).unwrap(),
         }
     }
 }
@@ -193,8 +195,24 @@ impl Session {
                 .as_str())
     }
     pub async fn logout(&self) -> Result<()> {
+        let body = self
+            .client
+            .get("https://codeforces.com")
+            .send()
+            .await?
+            .error_for_status()?
+            .text()
+            .await?;
+        let url = self
+            .regex
+            .logout
+            .captures(body.as_str())
+            .ok_or("Logout url regex mismatch")?
+            .get(1)
+            .unwrap()
+            .as_str();
         self.client
-            .get("https://codeforces.com/logout")
+            .get(format!("https://codeforces.com/{}/logout", url))
             .send()
             .await?
             .error_for_status()?;
