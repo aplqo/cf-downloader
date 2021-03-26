@@ -127,8 +127,7 @@ impl<'a> Downloader<'a> {
         F: Callback,
     {
         let length = end - begin;
-        let mut verdicts = Vec::new();
-        verdicts.reserve(length);
+        let mut verdicts = Vec::with_capacity(length);
         {
             let mut encoder = Enc::new(template, end)?;
             let mut next = Instant::now();
@@ -137,11 +136,10 @@ impl<'a> Downloader<'a> {
             }
             encoder.init();
             for (ind, i) in self.list.data[begin..end].iter().enumerate() {
-                let mut cur = Vec::new();
                 if i.input.is_none() {
-                    call.on_case_begin(ind + begin);
                     let count = (i.output_size + BLOCK - 1) / BLOCK;
-                    cur.reserve(count);
+                    let mut cur = Vec::with_capacity(count);
+                    call.on_case_begin(ind + begin);
                     for j in 0..count {
                         cur.push(
                             self.submit_code(
@@ -155,9 +153,11 @@ impl<'a> Downloader<'a> {
                             call.on_progress(ind + begin, j, count);
                         }
                     }
+                    verdicts.push(cur);
+                } else {
+                    verdicts.push(Vec::new());
                 }
                 encoder.push_ignore(&i.data_id);
-                verdicts.push(cur);
             }
         }
         let mut ret: Vec<String> = Vec::new();

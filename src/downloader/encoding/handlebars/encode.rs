@@ -27,10 +27,9 @@ impl<'a> traits::DataEncoder<'a> for Encoder<'a> {
         let mut ret = Encoder {
             random: 0,
             length: BLOCK,
-            ignore: Vec::new(),
+            ignore: Vec::with_capacity(max),
             engine: Handlebars::new(),
         };
-        ret.ignore.reserve(max);
         ret.engine
             .register_template_string("code", template.content.as_str())?;
         Ok(ret)

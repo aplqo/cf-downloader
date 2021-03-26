@@ -23,11 +23,10 @@ impl<'a> traits::MetaEncoding<'a> for Meta<'a> {
         let mut ret = Meta {
             param: MetaParam {
                 random: 0,
-                ignore: Vec::new(),
+                ignore: Vec::with_capacity(max),
             },
             engine: Handlebars::new(),
         };
-        ret.param.ignore.reserve(max);
         ret.engine
             .register_template_string("code", template.content.as_str())?;
         Ok(ret)
