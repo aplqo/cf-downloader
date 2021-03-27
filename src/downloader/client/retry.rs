@@ -1,10 +1,12 @@
 extern crate reqwest;
 extern crate tokio;
 
-use crate::types::Result;
+use crate::{
+    config::retry::{FORBIDDEN_DELAY, RETRY_COUNT, RETRY_DELAY},
+    types::Result,
+};
 use std::future::Future;
-use tokio::time::{sleep, Duration};
-include!("../config/retry.rs");
+use tokio::time::sleep;
 
 pub(super) async fn async_retry<'a, F, U, Out>(fun: F) -> Result<Out>
 where

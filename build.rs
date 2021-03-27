@@ -1,7 +1,6 @@
 use chrono::{DateTime, Local};
-use std::{env, io::Write, path::Path, process::Command, time::Duration};
-include!("./src/downloader/config/delay.rs");
-include!("./src/downloader/config/retry.rs");
+use std::{env, io::Write, path::Path, process::Command};
+include!("./src/downloader/config.rs");
 
 fn launch(cmd: &mut Command) -> String {
     String::from_utf8(cmd.output().unwrap().stdout).unwrap()
@@ -56,9 +55,9 @@ fn set_long_version(out_dir: &Path, date: &DateTime<Local>, branch: &str, profil
     submit_delay: {}s
     get_submisison_delay: {}s
     check_delay: {}s"#,
-        SUBMIT_DELAY.as_secs_f32(),
-        SUBMISSION_GET_DELAY.as_secs_f32(),
-        CHECK_DELAY.as_secs_f32()
+        submitter::SUBMIT_DELAY.as_secs_f32(),
+        submitter::SUBMISSION_GET_DELAY.as_secs_f32(),
+        submission::CHECK_DELAY.as_secs_f32()
     )
     .unwrap();
     writeln!(
@@ -68,9 +67,9 @@ fn set_long_version(out_dir: &Path, date: &DateTime<Local>, branch: &str, profil
     delay_after_http403: {}s
     count: {}
     "#,
-        RETRY_DELAY.as_secs_f32(),
-        FORBIDDEN_DELAY.as_secs_f32(),
-        RETRY_COUNT
+        retry::RETRY_DELAY.as_secs_f32(),
+        retry::FORBIDDEN_DELAY.as_secs_f32(),
+        retry::RETRY_COUNT
     )
     .unwrap();
 }

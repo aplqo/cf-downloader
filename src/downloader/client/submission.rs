@@ -2,12 +2,14 @@ extern crate reqwest;
 extern crate tokio;
 
 use super::{retry::async_retry, verdict::Verdict};
-use crate::types::{Error, Result};
+use crate::{
+    config::submission::CHECK_DELAY,
+    types::{Error, Result},
+};
 use reqwest::Client;
 use std::collections::HashMap;
-use tokio::time::{sleep_until, Duration, Instant};
+use tokio::time::{sleep_until, Instant};
 
-include!("../config/submission.rs");
 const MAX_OUTPUT: usize = 500;
 
 pub struct Submission {
