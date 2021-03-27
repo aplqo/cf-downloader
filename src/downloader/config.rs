@@ -8,6 +8,9 @@ pub mod submission {
     use std::time::Duration;
     pub const CHECK_DELAY: Duration = Duration::from_secs(2);
 }
+pub mod session {
+    pub const VERBOSE: bool = true;
+}
 pub mod submitter {
     use std::time::Duration;
     pub const DELAY_PER_ACCOUNT: Duration = Duration::from_secs(15);
@@ -19,4 +22,8 @@ pub mod register {
     pub const HANDLE_LEN: usize = 10;
     pub const PASSWORD_LEN: usize = 10;
     pub const REGISTER_DELAY: Duration = Duration::from_secs(10);
+}
+pub mod email {
+    use std::time::Duration;
+    pub const CHECK_DELAY: Duration = Duration::from_secs(10);
 }

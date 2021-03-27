@@ -8,6 +8,7 @@ use super::{
 };
 use crate::{
     account::Account,
+    config::session::VERBOSE,
     email::Email,
     random::random_string,
     types::{Error, Result},
@@ -67,6 +68,7 @@ impl Session {
             client: Client::builder()
                 .user_agent(FIREFOX_UA)
                 .cookie_store(true)
+                .connection_verbose(VERBOSE)
                 .build()
                 .unwrap(),
             handle: String::new(),
@@ -83,6 +85,7 @@ impl Session {
             client: builder
                 .user_agent(FIREFOX_UA)
                 .cookie_store(true)
+                .connection_verbose(VERBOSE)
                 .build()
                 .unwrap(),
             handle: login.handle,
@@ -118,6 +121,21 @@ impl Session {
                     ("email", email.address.as_str()),
                     ("password", password),
                     ("passwordConfirmation", password),
+                    ("_tta", "510"),
+                ])
+                .send()
+                .await?
+                .error_for_status()
+        })
+        .await?;
+        async_retry(async || {
+            self.client
+                .post("https://codeforces.com/register/confirmation")
+                .form(&[
+                    ("csrf_token", csrf.as_str()),
+                    ("action", "send"),
+                    ("handle", handle),
+                    ("email", email.address.as_str()),
                     ("_tta", "510"),
                 ])
                 .send()

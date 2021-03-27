@@ -2,12 +2,11 @@ extern crate reqwest;
 extern crate serde;
 extern crate tokio;
 
-use crate::types::Result;
+use crate::{config::email::CHECK_DELAY, types::Result};
 use reqwest::Client;
 use serde::Deserialize;
 use std::vec::Vec;
-use tokio::time::{sleep, Duration};
-const CHECK_DELAY: Duration = Duration::from_secs(20);
+use tokio::time::sleep;
 const ADDRESS_URL: &str = "https://10minutemail.net/address.api.php";
 const MAIL_URL: &str = "https://10minutemail.net/mail.api.php";
 const NEW_URL: &str = "https://10minutemail.net/new.html";
