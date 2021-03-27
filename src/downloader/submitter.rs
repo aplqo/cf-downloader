@@ -1,22 +1,16 @@
 extern crate futures;
-extern crate serde_yaml;
 extern crate tokio;
 
 use crate::{
+    account::Account,
     config::submitter::{DELAY_PER_ACCOUNT, SUBMISSION_GET_DELAY, SUBMIT_DELAY},
-    judge::{
-        problem::Problem,
-        session::{Account, Session},
-        submission::Submission,
-    },
+    judge::{problem::Problem, session::Session, submission::Submission},
     types::Result,
 };
 use core::cmp::{Ord, PartialOrd};
-use serde_yaml::from_reader;
 use std::{
     cmp::{max, Reverse},
     collections::BinaryHeap,
-    fs::File,
     mem::take,
     vec::Vec,
 };
@@ -69,13 +63,12 @@ impl Submitter {
             },
         }
     }
-    pub async fn login(&mut self, config: &str) -> Result<()> {
-        let mut info: Vec<Account> = from_reader(File::open(config)?)?;
-        self.list.expand(info.len());
-        self.session.reserve(info.len());
-        while !info.is_empty() {
+    pub async fn login(&mut self, mut accounts: Vec<Account>) -> Result<()> {
+        self.list.expand(accounts.len());
+        self.session.reserve(accounts.len());
+        while !accounts.is_empty() {
             self.session
-                .push(Session::from_login(info.pop().unwrap()).await?);
+                .push(Session::from_account(accounts.pop().unwrap()).await?);
         }
         Ok(())
     }
@@ -113,6 +106,9 @@ impl Submitter {
             result[index] = r.await?;
         }
         Ok(result)
+    }
+    pub fn is_empty(&self) -> bool {
+        self.session.is_empty()
     }
 
     pub async fn logout(&self) -> Result<()> {

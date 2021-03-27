@@ -1,6 +1,5 @@
 extern crate regex;
 extern crate reqwest;
-extern crate serde;
 
 use super::{
     problem::{get_problem_url, Problem, Type},
@@ -8,13 +7,13 @@ use super::{
     submission::Submission,
 };
 use crate::{
+    account::Account,
     email::Email,
     random::random_string,
     types::{Error, Result},
 };
 use regex::Regex;
 use reqwest::{Client, Proxy, RequestBuilder};
-use serde::{Deserialize, Serialize};
 
 const BFAA: &str = "f1b3f18c715565b589b7823cda7448ce";
 const FIREFOX_UA: &str = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0";
@@ -56,12 +55,6 @@ async fn search_response<T: Fn() -> RequestBuilder>(
     )
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Account {
-    pub handle: String,
-    pub password: String,
-    pub proxy: Option<String>,
-}
 pub struct Session {
     pub(super) client: Client,
     pub handle: String,
@@ -81,7 +74,7 @@ impl Session {
             regex: UtilityRegex::new(),
         }
     }
-    pub async fn from_login(login: Account) -> Result<Self> {
+    pub async fn from_account(login: Account) -> Result<Self> {
         let mut builder = Client::builder();
         if let Some(p) = login.proxy {
             builder = builder.proxy(Proxy::https(p)?);
