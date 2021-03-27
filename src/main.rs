@@ -2,7 +2,7 @@ extern crate clap;
 extern crate termcolor;
 
 use cf_downloader::{
-    client::{
+    api::{
         problem::{Problem, Type},
         session::Session,
     },
@@ -12,9 +12,9 @@ use cf_downloader::{
         handlebars::{encode::Encoder, meta::Meta},
         Template,
     },
-    types::Result,
+    submitter::Submitter,
 };
-use clap::{crate_description, Clap};
+use clap::{crate_description, crate_name, App, Arg};
 use std::{
     fs::File,
     io::{stdin, Read, Write},
@@ -31,13 +31,6 @@ macro_rules! get_version {
             include_str!(concat!(env!("OUT_DIR"), "/", $file))
         )
     };
-}
-#[derive(Clap)]
-#[clap(version = get_version!("version"), long_version = get_version!("long_version"), about = crate_description!())]
-struct Login {
-    handle: String,
-    password: String,
-    proxy: Option<String>,
 }
 
 fn set_fg(stdout: &mut StandardStream, color: Color) {
@@ -77,11 +70,6 @@ macro_rules! write_ok {
 macro_rules! write_progress {
     ($dest:expr, $typ:expr, $($arg:tt)*) => {
         write_color!($dest, Color::Cyan, $typ, $($arg)*);
-    };
-}
-macro_rules! write_warn {
-    ($dest:expr,$typ:expr, $($arg:tt)*) => {
-       write_color!($dest, Color::Yellow, $typ, $($arg)*);
     };
 }
 
@@ -205,7 +193,12 @@ impl<'a> Callback for GetDataCall<'a> {
 }
 
 #[allow(unused_must_use)]
-fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
+fn problem_loop(
+    stdout: &mut StandardStream,
+    session: &Session,
+    submitter: &mut Submitter,
+    rt: &Runtime,
+) {
     let problem = read_problem(stdout, session, rt);
     write_info!(
         stdout,
@@ -216,7 +209,7 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
     );
     stdout.reset();
     let prompt = format!("cf-downloader [{} {}]> ", problem.contest, problem.id);
-    let mut downloader: Downloader = Downloader::new(session, problem);
+    let mut downloader: Downloader = Downloader::new(problem);
     loop {
         match read_line(stdout, prompt.as_bytes()).trim() {
             "get_meta" => {
@@ -224,6 +217,7 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
                 let template = read_template(stdout);
                 write_info!(stdout, "Info", "Loading {} more testcase's metadata", cnt);
                 if let Err(e) = rt.block_on(downloader.get_meta::<Meta, _>(
+                    submitter,
                     &template,
                     cnt,
                     GetMetaCall { stdout },
@@ -246,6 +240,7 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
                     match rt.block_on(async {
                         downloader
                             .get_data::<Encoder, Decoder, _>(
+                                submitter,
                                 &read_template(stdout),
                                 begin,
                                 end,
@@ -283,40 +278,36 @@ fn problem_loop(stdout: &mut StandardStream, session: &Session, rt: &Runtime) {
         stdout.reset();
     }
 }
-async fn login(login: Login) -> Result<Session> {
-    let ret = Session::new(login.handle, login.proxy)?;
-    ret.login(login.password.as_str()).await?;
-    Ok(ret)
-}
 
 #[allow(unused_must_use)]
 fn main() {
     let rt = Runtime::new().unwrap();
     let mut stdout = StandardStream::stdout(ColorChoice::Auto);
-    let info: Login = Login::parse();
-    write_info!(&mut stdout, "Info", "Logging in as {}", &info.handle);
-    match &info.proxy {
-        Some(p) => write_info!(&mut stdout, "Info", "Using https proxy: {}", p),
-        None => write_warn!(&mut stdout, "Warn", "No proxy set, ip address is leaked."),
-    };
-
-    let session = match rt.block_on(login(info)) {
-        Ok(v) => {
-            write_ok!(&mut stdout, "Success", "Logged into codeforces.com");
-            v
-        }
-        Err(e) => {
-            write_error!(&mut stdout, "Fail", "login: {}", e.to_string());
-            stdout.reset();
-            return;
-        }
-    };
+    let app = App::new(crate_name!())
+        .about(crate_description!())
+        .version(get_version!("version"))
+        .long_version(get_version!("long_version"))
+        .arg(
+            Arg::new("account")
+                .required(true)
+                .about("Path to account list"),
+        )
+        .get_matches();
+    let session = Session::new(String::from("fakeuser"), None).unwrap();
+    let mut submit = Submitter::new();
+    write_info!(&mut stdout, "Info", "Logging in...");
+    if let Err(e) = rt.block_on(submit.login(app.value_of("account").unwrap())) {
+        write_error!(&mut stdout, "Fail", "login: {}", e.to_string());
+        rt.block_on(submit.logout()).unwrap();
+        stdout.reset();
+        return;
+    }
+    write_ok!(&mut stdout, "Success", "Logged into codeforces.com");
     stdout.reset();
-
     loop {
         match read_line(&mut stdout, b"cf-downloader> ").trim() {
             "select" => {
-                problem_loop(&mut stdout, &session, &rt);
+                problem_loop(&mut stdout, &session, &mut submit, &rt);
             }
             "exit" => break,
             unknown => write_error!(
@@ -330,7 +321,7 @@ fn main() {
     }
 
     write_info!(&mut stdout, "Info", "Logging out from codeforces.com");
-    rt.block_on(session.logout()).unwrap();
+    rt.block_on(submit.logout()).unwrap();
     write_ok!(&mut stdout, "Success", "Logged out from codeforces.com");
     stdout.reset();
 }
