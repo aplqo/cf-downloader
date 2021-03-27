@@ -65,8 +65,8 @@ fn set_long_version(out_dir: &Path, date: &DateTime<Local>, branch: &str, profil
         &mut f,
         r#"retry:
     delay: {}s
-    delay_after_403: {}s
-    count: {}s
+    delay_after_http403: {}s
+    count: {}
     "#,
         RETRY_DELAY.as_secs_f32(),
         FORBIDDEN_DELAY.as_secs_f32(),
