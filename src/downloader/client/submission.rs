@@ -1,17 +1,21 @@
 extern crate reqwest;
+extern crate tokio;
 
-use super::{retry::async_retry, session::Session, verdict::Verdict};
+use super::{retry::async_retry, verdict::Verdict};
 use crate::types::{Error, Result};
+use reqwest::Client;
 use std::collections::HashMap;
+use tokio::time::{sleep_until, Duration, Instant};
 
+include!("../config/submission.rs");
 const MAX_OUTPUT: usize = 500;
 
-pub struct Submission<'a> {
-    pub(super) session: &'a Session,
+pub struct Submission {
+    pub(super) client: Client,
     pub(super) id: String,
     pub(super) csrf_token: String,
 }
-impl<'a> Submission<'a> {
+impl Submission {
     fn full_data_or(data: String) -> Option<String> {
         if data.len() > MAX_OUTPUT {
             None
@@ -21,8 +25,7 @@ impl<'a> Submission<'a> {
     }
     pub async fn poll(&self, id: usize) -> Result<Option<Verdict>> {
         let mut data = async_retry(async || {
-            self.session
-                .client
+            self.client
                 .post("https://codeforces.com/data/submitSource")
                 .form(&[("submissionId", &self.id), ("csrf_token", &self.csrf_token)])
                 .send()
@@ -44,6 +47,16 @@ impl<'a> Submission<'a> {
                 output: data.remove(&format!("output#{}", pos)).unwrap(),
                 answer: Self::full_data_or(data.remove(&format!("answer#{}", pos)).unwrap()),
             }));
+        }
+    }
+    pub async fn wait(&self, id: usize) -> Result<Verdict> {
+        let mut next = Instant::now();
+        loop {
+            sleep_until(next).await;
+            if let Some(v) = self.poll(id).await? {
+                return Ok(v);
+            }
+            next += CHECK_DELAY;
         }
     }
 }

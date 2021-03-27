@@ -2,14 +2,14 @@ extern crate reqwest;
 extern crate tokio;
 
 use crate::types::Result;
-use std::{result::Result as StdResult, time::Duration};
-use tokio::time::sleep;
+use std::future::Future;
+use tokio::time::{sleep, Duration};
 include!("../config/retry.rs");
 
 pub(super) async fn async_retry<'a, F, U, Out>(fun: F) -> Result<Out>
 where
     F: Fn() -> U,
-    U: core::future::Future<Output = StdResult<Out, reqwest::Error>>,
+    U: Future<Output = reqwest::Result<Out>>,
 {
     for _i in 0..RETRY_COUNT - 1 {
         match fun().await {
