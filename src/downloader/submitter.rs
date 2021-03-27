@@ -3,12 +3,12 @@ extern crate serde_yaml;
 extern crate tokio;
 
 use crate::{
-    client::{
+    config::submitter::{DELAY_PER_ACCOUNT, SUBMISSION_GET_DELAY, SUBMIT_DELAY},
+    judge::{
         problem::Problem,
         session::{Account, Session},
         submission::Submission,
     },
-    config::submitter::{DELAY_PER_ACCOUNT, SUBMISSION_GET_DELAY, SUBMIT_DELAY},
     types::Result,
 };
 use core::cmp::{Ord, PartialOrd};

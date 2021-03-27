@@ -1,7 +1,8 @@
 extern crate serde;
 
 use crate::{
-    encoding::{traits, utility::random, Template},
+    encoding::{traits, Template},
+    random::random_standard,
     types::{DataId, Result, BLOCK},
 };
 use handlebars::Handlebars;
@@ -35,7 +36,7 @@ impl<'a> traits::DataEncoder<'a> for Encoder<'a> {
         Ok(ret)
     }
     fn init(&mut self) {
-        self.random = random();
+        self.random = random_standard();
     }
     fn push_ignore(&mut self, hash: &'a DataId) {
         self.ignore.push(hash);

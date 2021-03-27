@@ -1,4 +1,3 @@
-extern crate rand;
 extern crate regex;
 extern crate reqwest;
 extern crate serde;
@@ -8,12 +7,14 @@ use super::{
     retry::async_retry,
     submission::Submission,
 };
-use crate::types::{Error, Result};
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use crate::{
+    email::Email,
+    random::random_string,
+    types::{Error, Result},
+};
 use regex::Regex;
 use reqwest::{Client, Proxy, RequestBuilder};
 use serde::{Deserialize, Serialize};
-use std::iter;
 
 const BFAA: &str = "f1b3f18c715565b589b7823cda7448ce";
 const FIREFOX_UA: &str = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0";
@@ -35,14 +36,6 @@ impl UtilityRegex {
             logout: Regex::new(r#"<a href="/([[:xdigit:]]+)/logout""#).unwrap(),
         }
     }
-}
-
-fn random_string() -> String {
-    iter::repeat(())
-        .map(|()| thread_rng().sample(Alphanumeric))
-        .map(char::from)
-        .take(18)
-        .collect()
 }
 
 fn search_text(str: String, regex: &Regex, error: &str) -> Result<String> {
@@ -71,29 +64,38 @@ pub struct Account {
 }
 pub struct Session {
     pub(super) client: Client,
-    handle: String,
+    pub handle: String,
     ftaa: String,
     regex: UtilityRegex,
 }
 impl Session {
-    pub fn new(handle: String, proxy: Option<String>) -> Result<Self> {
+    pub fn new() -> Self {
+        Session {
+            client: Client::builder()
+                .user_agent(FIREFOX_UA)
+                .cookie_store(true)
+                .build()
+                .unwrap(),
+            handle: String::new(),
+            ftaa: random_string(18),
+            regex: UtilityRegex::new(),
+        }
+    }
+    pub async fn from_login(login: Account) -> Result<Self> {
         let mut builder = Client::builder();
-        if let Some(p) = proxy {
+        if let Some(p) = login.proxy {
             builder = builder.proxy(Proxy::https(p)?);
         }
-        Ok(Session {
+        let ret = Session {
             client: builder
                 .user_agent(FIREFOX_UA)
                 .cookie_store(true)
                 .build()
                 .unwrap(),
-            handle,
-            ftaa: random_string(),
+            handle: login.handle,
+            ftaa: random_string(18),
             regex: UtilityRegex::new(),
-        })
-    }
-    pub async fn from_login(login: Account) -> Result<Self> {
-        let ret = Self::new(login.handle, login.proxy)?;
+        };
         ret.login(login.password.as_str()).await?;
         Ok(ret)
     }
@@ -105,6 +107,39 @@ impl Session {
             "Regex to find csrf token not matched",
         )
         .await
+    }
+    pub async fn register(&self, handle: &str, password: &str, email: &Email) -> Result<()> {
+        const URL: &str = "https://codeforces.com/register";
+        let csrf = self.get_csrf(URL).await?;
+        async_retry(async || {
+            self.client
+                .post(URL)
+                .form(&[
+                    ("csrf_token", csrf.as_str()),
+                    ("ftaa", self.ftaa.as_str()),
+                    ("bfaa", BFAA),
+                    ("action", "register"),
+                    ("handle", handle),
+                    ("name", handle),
+                    ("age", ""),
+                    ("email", email.address.as_str()),
+                    ("password", password),
+                    ("passwordConfirmation", password),
+                    ("_tta", "510"),
+                ])
+                .send()
+                .await?
+                .error_for_status()
+        })
+        .await?;
+        for p in email.wait_email_urls("noreply@codeforces.com").await? {
+            if p.contains("register") {
+                async_retry(async || self.client.get(p.as_str()).send().await?.error_for_status())
+                    .await?;
+                return Ok(());
+            }
+        }
+        Err(Error::new("Can't find confirm address".to_string()))
     }
     pub async fn login(&self, password: &str) -> Result<()> {
         const URL: &str = "https://codeforces.com/enter";

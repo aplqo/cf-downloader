@@ -1,6 +1,6 @@
 use crate::{
-    client::verdict::Verdict,
     encoding::Template,
+    judge::verdict::Verdict,
     types::{DataId, Result, TestMeta},
 };
 

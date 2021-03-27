@@ -1,8 +1,9 @@
 extern crate serde;
 
 use crate::{
-    client::verdict::Verdict,
-    encoding::{traits, utility::random, Template},
+    encoding::{traits, Template},
+    judge::verdict::Verdict,
+    random::random_standard,
     types::{DataId, Result, TestMeta},
 };
 use handlebars::Handlebars;
@@ -32,7 +33,7 @@ impl<'a> traits::MetaEncoding<'a> for Meta<'a> {
         Ok(ret)
     }
     fn init(&mut self) {
-        self.param.random = random();
+        self.param.random = random_standard();
     }
     fn ignore(&mut self, hash: &'a DataId) {
         self.param.ignore.push(hash);

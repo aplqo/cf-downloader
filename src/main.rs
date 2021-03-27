@@ -2,15 +2,15 @@ extern crate clap;
 extern crate termcolor;
 
 use cf_downloader::{
-    api::{
-        problem::{Problem, Type},
-        session::Session,
-    },
     downloader::{Callback, Downloader},
     encoding::{
         gzip::Decoder,
         handlebars::{encode::Encoder, meta::Meta},
         Template,
+    },
+    judge::{
+        problem::{Problem, Type},
+        session::Session,
     },
     submitter::Submitter,
 };

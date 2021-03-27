@@ -1,11 +1,11 @@
 extern crate serde;
 
 use crate::{
-    client::problem::Problem,
     encoding::{
         traits::{DataDecoder, DataEncoder, MetaEncoding},
         Template,
     },
+    judge::problem::Problem,
     submitter::Submitter,
     types::{Error, Result, TestMeta, BLOCK},
 };

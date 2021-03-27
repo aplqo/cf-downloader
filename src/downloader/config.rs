@@ -14,3 +14,9 @@ pub mod submitter {
     pub const SUBMISSION_GET_DELAY: Duration = Duration::from_secs(1);
     pub const SUBMIT_DELAY: Duration = Duration::from_secs(5);
 }
+pub mod register {
+    use std::time::Duration;
+    pub const HANDLE_LEN: usize = 10;
+    pub const PASSWORD_LEN: usize = 10;
+    pub const REGISTER_DELAY: Duration = Duration::from_secs(10);
+}
