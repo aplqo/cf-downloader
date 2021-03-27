@@ -47,6 +47,9 @@ impl AccountList {
         }));
         account.id
     }
+    fn clear(&mut self) {
+        self.heap.clear();
+    }
 }
 
 pub struct Submitter {
@@ -111,10 +114,12 @@ impl Submitter {
         self.session.is_empty()
     }
 
-    pub async fn logout(&self) -> Result<()> {
+    pub async fn logout(&mut self) -> Result<()> {
         for i in &self.session {
             i.logout().await?;
         }
+        self.session.clear();
+        self.list.clear();
         Ok(())
     }
 }

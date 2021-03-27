@@ -55,7 +55,7 @@ impl Email {
     pub async fn wait_email_urls(&self, from: &str) -> Result<Vec<String>> {
         loop {
             for i in self.get_response().await?.mail_list {
-                if i.from == from {
+                if i.from.trim() == from {
                     return Ok(self
                         .client
                         .get(MAIL_URL)

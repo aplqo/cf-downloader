@@ -9,7 +9,7 @@ pub mod submission {
     pub const CHECK_DELAY: Duration = Duration::from_secs(2);
 }
 pub mod session {
-    pub const VERBOSE: bool = true;
+    pub const VERBOSE: bool = false;
 }
 pub mod submitter {
     use std::time::Duration;

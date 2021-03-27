@@ -24,6 +24,7 @@ struct UtilityRegex {
     login: Regex,
     submit: Regex,
     last_submit: Regex,
+    register: Regex,
     logout: Regex,
 }
 impl UtilityRegex {
@@ -33,12 +34,14 @@ impl UtilityRegex {
             login: Regex::new(r#"handle = "[[:word:]]+"#).unwrap(),
             submit: Regex::new(r#"error[a-zA-Z_\-\\ ]*">(.*)</span>"#).unwrap(),
             last_submit: Regex::new(r#"data-submission-id="([[:digit:]]+)""#).unwrap(),
+            register: Regex::new(r#"\$\("input\[name=name\]"\)\.val\("([[:xdigit:]]+)"\);"#)
+                .unwrap(),
             logout: Regex::new(r#"<a href="/([[:xdigit:]]+)/logout""#).unwrap(),
         }
     }
 }
 
-fn search_text(str: String, regex: &Regex, error: &str) -> Result<String> {
+fn search_text(str: &String, regex: &Regex, error: &str) -> Result<String> {
     match regex.captures(str.as_str()) {
         Some(v) => Ok(v.get(1).unwrap().as_str().to_owned()),
         None => Err(Error::new(error.to_string())),
@@ -50,7 +53,7 @@ async fn search_response<T: Fn() -> RequestBuilder>(
     error: &str,
 ) -> Result<String> {
     search_text(
-        async_retry(async || fun().send().await?.error_for_status()?.text().await).await?,
+        &async_retry(async || fun().send().await?.error_for_status()?.text().await).await?,
         regex,
         error,
     )
@@ -106,7 +109,18 @@ impl Session {
     }
     pub async fn register(&self, handle: &str, password: &str, email: &Email) -> Result<()> {
         const URL: &str = "https://codeforces.com/register";
-        let csrf = self.get_csrf(URL).await?;
+        let body = async_retry(async || {
+            self.client
+                .get(URL)
+                .send()
+                .await?
+                .error_for_status()?
+                .text()
+                .await
+        })
+        .await?;
+        let csrf = search_text(&body, &self.regex.csrf, "Can't find csrf token")?;
+        let name = search_text(&body, &self.regex.register, "Can't find register name")?;
         async_retry(async || {
             self.client
                 .post(URL)
@@ -116,7 +130,7 @@ impl Session {
                     ("bfaa", BFAA),
                     ("action", "register"),
                     ("handle", handle),
-                    ("name", handle),
+                    ("name", name.as_str()),
                     ("age", ""),
                     ("email", email.address.as_str()),
                     ("password", password),

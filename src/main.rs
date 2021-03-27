@@ -1,7 +1,10 @@
+#![feature(try_blocks)]
 extern crate clap;
+extern crate pretty_env_logger;
 extern crate termcolor;
 
 use cf_downloader::{
+    account::{self, Account},
     downloader::{Callback, Downloader},
     encoding::{
         gzip::Decoder,
@@ -13,8 +16,10 @@ use cf_downloader::{
         session::Session,
     },
     submitter::Submitter,
+    types::Result,
 };
 use clap::{crate_description, crate_name, App, Arg};
+use pretty_env_logger::init_timed;
 use std::{
     fs::File,
     io::{stdin, Read, Write},
@@ -278,38 +283,88 @@ fn problem_loop(
         stdout.reset();
     }
 }
+#[allow(unused_must_use)]
+async fn login(submitter: &mut Submitter, stdout: &mut StandardStream, file: &str) {
+    write_info!(stdout, "Info", "Logging in...");
+    let p: Result<()> = try {
+        submitter
+            .login(account::from_reader(File::open(file)?)?)
+            .await?
+    };
+    if let Err(e) = p {
+        write_error!(stdout, "Error", "login: {}", e.to_string());
+    } else {
+        write_ok!(stdout, "Success", "Logged into codeforces.com");
+    }
+}
+#[allow(unused_must_use)]
+async fn register(stdout: &mut StandardStream) -> Result<Vec<Account>> {
+    let count = read_usize(stdout, b"Count: ", 1, usize::MAX);
+    let file = read_line(stdout, b"File path: ");
+    let wdr = File::create(file)?;
+    write_info!(stdout, "Info", "Registering {} account...", count);
+    let ret = account::register(count).await?;
+    write_ok!(stdout, "Success", "Registered {} account.", count);
+    account::to_writer(wdr, &ret)?;
+    Ok(ret)
+}
+#[allow(unused_must_use)]
+async fn logout(stdout: &mut StandardStream, submitter: &mut Submitter) {
+    write_info!(stdout, "Info", "Logging out from codeforces.com");
+    match submitter.logout().await {
+        Ok(_) => {
+            write_ok!(stdout, "Success", "Logged out from codeforces.com");
+        }
+        Err(e) => {
+            write_error!(stdout, "Error", "logout: {}", e.to_string());
+        }
+    }
+}
 
 #[allow(unused_must_use)]
 fn main() {
+    init_timed();
     let rt = Runtime::new().unwrap();
     let mut stdout = StandardStream::stdout(ColorChoice::Auto);
     let app = App::new(crate_name!())
         .about(crate_description!())
         .version(get_version!("version"))
         .long_version(get_version!("long_version"))
-        .arg(
-            Arg::new("account")
-                .required(true)
-                .about("Path to account list"),
-        )
+        .arg(Arg::new("account").about("Path to account list"))
         .get_matches();
-    let session = Session::new(String::from("fakeuser"), None).unwrap();
+    let session = Session::new();
     let mut submit = Submitter::new();
-    write_info!(&mut stdout, "Info", "Logging in...");
-    if let Err(e) = rt.block_on(submit.login(app.value_of("account").unwrap())) {
-        write_error!(&mut stdout, "Fail", "login: {}", e.to_string());
-        rt.block_on(submit.logout()).unwrap();
+    if let Some(f) = app.value_of("account") {
+        rt.block_on(login(&mut submit, &mut stdout, f));
         stdout.reset();
-        return;
     }
-    write_ok!(&mut stdout, "Success", "Logged into codeforces.com");
-    stdout.reset();
     loop {
         match read_line(&mut stdout, b"cf-downloader> ").trim() {
             "select" => {
-                problem_loop(&mut stdout, &session, &mut submit, &rt);
+                if submit.is_empty() {
+                    write_error!(&mut stdout, "Error", "No logined account!");
+                } else {
+                    problem_loop(&mut stdout, &session, &mut submit, &rt);
+                }
             }
             "exit" => break,
+            "login" => {
+                let path = read_line(&mut stdout, b"File path: ");
+                rt.block_on(login(&mut submit, &mut stdout, path.as_str()));
+            }
+            "register" => match rt.block_on(register(&mut stdout)) {
+                Ok(v) => {
+                    if let Err(e) = rt.block_on(submit.login(v)) {
+                        write_error!(&mut stdout, "Error", "login: {}", e.to_string());
+                    }
+                }
+                Err(e) => {
+                    write_error!(&mut stdout, "Error", "register: {}", e.to_string());
+                }
+            },
+            "logout" => {
+                rt.block_on(logout(&mut stdout, &mut submit));
+            }
             unknown => write_error!(
                 &mut stdout,
                 "Error",
@@ -319,9 +374,6 @@ fn main() {
         }
         stdout.reset();
     }
-
-    write_info!(&mut stdout, "Info", "Logging out from codeforces.com");
-    rt.block_on(submit.logout()).unwrap();
-    write_ok!(&mut stdout, "Success", "Logged out from codeforces.com");
+    rt.block_on(logout(&mut stdout, &mut submit));
     stdout.reset();
 }
