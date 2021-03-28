@@ -1,16 +1,16 @@
-extern crate futures;
 extern crate tokio;
 
 use crate::{
     account::Account,
     config::submitter::{DELAY_PER_ACCOUNT, SUBMISSION_GET_DELAY, SUBMIT_DELAY},
-    judge::{problem::Problem, session::Session, submission::Submission},
+    judge::{problem::Problem, session::Session, submit::Submission},
     types::Result,
 };
 use core::cmp::{Ord, PartialOrd};
 use std::{
     cmp::{max, Reverse},
     collections::BinaryHeap,
+    error::Error,
     mem::take,
     vec::Vec,
 };
@@ -52,6 +52,11 @@ impl AccountList {
     }
 }
 
+async fn get_last_submission(session: &Session, problem: &Problem) -> Result<Submission> {
+    sleep(SUBMISSION_GET_DELAY).await;
+    session.get_last_submission(problem).await
+}
+
 pub struct Submitter {
     session: Vec<Session>,
     list: AccountList,
@@ -66,14 +71,25 @@ impl Submitter {
             },
         }
     }
-    pub async fn login(&mut self, mut accounts: Vec<Account>) -> Result<()> {
+    pub async fn login(&mut self, accounts: Vec<Account>) -> Vec<Box<dyn Error>> {
         self.list.expand(accounts.len());
         self.session.reserve(accounts.len());
-        while !accounts.is_empty() {
-            self.session
-                .push(Session::from_account(accounts.pop().unwrap()).await?);
+        let mut ret = Vec::new();
+        for i in accounts {
+            match Session::from_account(i).await {
+                Ok(v) => {
+                    self.session.push(v);
+                }
+                Err(e) => {
+                    ret.push(e);
+                }
+            }
         }
-        Ok(())
+        ret
+    }
+    pub async fn add_session(&mut self, mut sessions: Vec<Session>) {
+        self.list.expand(sessions.len());
+        self.session.append(&mut sessions);
     }
     pub async fn submit(
         &mut self,
@@ -103,7 +119,7 @@ impl Submitter {
                 result[index] = r.await?;
             }
             self.session[id].submit(problem, language, code).await?;
-            last[id] = Some((index, self.session[id].get_last_submission(problem)));
+            last[id] = Some((index, get_last_submission(&self.session[id], problem)));
         }
         for (index, r) in last.into_iter().flatten() {
             result[index] = r.await?;
