@@ -4,12 +4,15 @@ pub mod retry {
     pub const RETRY_DELAY: Duration = Duration::from_millis(200);
     pub const FORBIDDEN_DELAY: Duration = Duration::from_secs(120);
 }
-pub mod submission {
-    use std::time::Duration;
-    pub const CHECK_DELAY: Duration = Duration::from_secs(2);
-}
-pub mod session {
-    pub const VERBOSE: bool = false;
+pub mod judge {
+    pub mod session {
+        pub const VERBOSE: bool = false;
+        pub const BFAA: &str = "b182688b66909d3192211b04acf4ae61";
+    }
+    pub mod submit {
+        use std::time::Duration;
+        pub const CHECK_DELAY: Duration = Duration::from_secs(2);
+    }
 }
 pub mod submitter {
     use std::time::Duration;
