@@ -108,22 +108,20 @@ impl Session {
         }
     }
     pub async fn logout(&self) -> Result<()> {
+        let url = search_response_or(
+            || self.client.get("https://codeforces.com"),
+            &self.regex.session.logout,
+            "Logout url regex mismatch",
+        )
+        .await?;
         async_retry(async || {
             self.client
-                .get(format!(
-                    "https://codeforces.com/{}/logout",
-                    search_response_or(
-                        || self.client.get("https://codeforces.com"),
-                        &self.regex.session.logout,
-                        "Logout url regex mismatch",
-                    )
-                    .await?
-                ))
+                .get(format!("https://codeforces.com/{}/logout", url))
                 .send()
                 .await?
                 .error_for_status()
         })
-        .await
-        .map_err(Error::from)
+        .await?;
+        Ok(())
     }
 }

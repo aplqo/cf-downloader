@@ -24,7 +24,7 @@ impl RegexSet {
         let ret = self
             .error
             .captures_iter(body.as_str())
-            .fold(String::new(), |text, v| {
+            .fold(String::new(), |mut text, v| {
                 text.push_str(v.get(1).unwrap().as_str());
                 text.push(';');
                 text
