@@ -61,7 +61,7 @@ pub async fn register(
     }
     (Some((vec_acc, vec_ses)), None)
 }
-pub fn to_writer<W: Write>(wdr: W, list: &Vec<Account>) -> Result<()> {
+pub fn to_writer<W: Write>(wdr: W, list: &[Account]) -> Result<()> {
     serde_yaml::to_writer(wdr, list)?;
     Ok(())
 }

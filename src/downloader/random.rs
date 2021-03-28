@@ -11,7 +11,7 @@ where
 pub fn random_hex(length: usize) -> String {
     let mut ret = thread_rng()
         .sample_iter::<u64, _>(Standard)
-        .take(length + 15 / 16)
+        .take((length + 15) / 16)
         .fold(String::new(), |mut acc, v| {
             acc.push_str(v.to_string().as_str());
             acc
