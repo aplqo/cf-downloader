@@ -6,11 +6,12 @@ use crate::{
     config::register::{HANDLE_LEN, PASSWORD_LEN, REGISTER_DELAY},
     email::Email,
     judge::session::Session,
-    random::random_string,
+    random::random_hex,
     types::Result,
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    error::Error,
     io::{Read, Write},
     vec::Vec,
 };
@@ -26,25 +27,39 @@ pub struct Account {
 pub fn from_reader<R: Read>(rdr: R) -> Result<Vec<Account>> {
     Ok(serde_yaml::from_reader(rdr)?)
 }
-pub async fn register(count: usize) -> Result<Vec<Account>> {
-    let mut ret = Vec::with_capacity(count);
+pub async fn register(
+    count: usize,
+) -> (Option<(Vec<Account>, Vec<Session>)>, Option<Box<dyn Error>>) {
     let mut email = Email::new();
-    let client = Session::new();
-    email.init().await?;
+    if let Err(e) = email.init().await {
+        return (None, Some(e));
+    }
+    let mut vec_acc = Vec::with_capacity(count);
+    let mut vec_ses = Vec::with_capacity(count);
+    let mut client = Session::new();
     for _ in 0..count {
+        if let Err(e) = email.new_address().await {
+            return (Some((vec_acc, vec_ses)), Some(e));
+        }
         let cur = Account {
-            handle: random_string(HANDLE_LEN),
-            password: random_string(PASSWORD_LEN),
+            handle: random_hex(HANDLE_LEN),
+            password: random_hex(PASSWORD_LEN),
             proxy: None,
         };
-        client
-            .register(cur.handle.as_str(), cur.password.as_str(), &email)
-            .await?;
-        ret.push(cur);
-        email.new_address().await?;
+        client.handle = cur.handle.clone();
+        match client.register(cur.password.as_str(), &email).await {
+            Ok(_) => {
+                vec_ses.push(client);
+                vec_acc.push(cur);
+                client = Session::new();
+            }
+            Err(e) => {
+                return (Some((vec_acc, vec_ses)), Some(e));
+            }
+        }
         sleep(REGISTER_DELAY).await;
     }
-    Ok(ret)
+    (Some((vec_acc, vec_ses)), None)
 }
 pub fn to_writer<W: Write>(wdr: W, list: &Vec<Account>) -> Result<()> {
     serde_yaml::to_writer(wdr, list)?;
