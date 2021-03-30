@@ -1,9 +1,11 @@
+extern crate handlebars;
 extern crate serde;
 
+use super::error::{rander_error, template_error, Result};
 use crate::{
     encoding::{traits, Template},
     random::random_standard,
-    types::{DataId, Result, BLOCK},
+    types::{DataId, BLOCK},
 };
 use handlebars::Handlebars;
 use serde::Serialize;
@@ -32,7 +34,8 @@ impl<'a> traits::DataEncoder<'a> for Encoder<'a> {
             engine: Handlebars::new(),
         };
         ret.engine
-            .register_template_string("code", template.content.as_str())?;
+            .register_template_string("code", template.content.as_str())
+            .map_err(template_error)?;
         Ok(ret)
     }
     fn init(&mut self) {
@@ -45,14 +48,16 @@ impl<'a> traits::DataEncoder<'a> for Encoder<'a> {
         self.ignore.pop();
     }
     fn generate(&self, offset: usize) -> Result<String> {
-        Ok(self.engine.render(
-            "code",
-            &EncParam {
-                random: self.random,
-                length: self.length,
-                offset,
-                ignore: &self.ignore,
-            },
-        )?)
+        self.engine
+            .render(
+                "code",
+                &EncParam {
+                    random: self.random,
+                    length: self.length,
+                    offset,
+                    ignore: &self.ignore,
+                },
+            )
+            .map_error(rander_error)
     }
 }
