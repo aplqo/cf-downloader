@@ -2,15 +2,15 @@ extern crate regex;
 extern crate reqwest;
 
 use super::{
+    error::{network_error, regex_mismatch, Error, Kind, Result},
     retry::async_retry,
-    search::{search_response_or, search_text_or},
+    search::{search_response, search_text},
     UtilityRegex,
 };
 use crate::{
     account::Account,
     config::judge::session::{BFAA, VERBOSE},
     random::random_hex,
-    types::{Error, Result},
 };
 use regex::Regex;
 use reqwest::{Client, ClientBuilder, Proxy};
@@ -30,6 +30,10 @@ impl RegexSet {
             logout: Regex::new(r#"<a href="/([[:xdigit:]]+)/logout""#).unwrap(),
         }
     }
+}
+
+fn csrf_network_error(error: reqwest::Error) -> Error {
+    Error::new(Kind::CSRF(network_error(error)), None)
 }
 
 pub struct Session {
@@ -57,7 +61,11 @@ impl Session {
     }
     pub async fn from_account(login: Account) -> Result<Self> {
         let ret = if let Some(p) = login.proxy {
-            Self::from_client(Client::builder().proxy(Proxy::https(p)?))
+            Self::from_client(
+                Client::builder()
+                    .proxy(Proxy::https(p))
+                    .map_err(|x| Error::new(Kind::Builder(x), None))?,
+            )
         } else {
             Self::new()
         };
@@ -66,14 +74,21 @@ impl Session {
     }
 
     pub(super) fn find_csrf(&self, response: &String) -> Result<String> {
-        search_text_or(
-            response,
-            &self.regex.session.csrf,
-            "Regex to find csrf token not matched",
-        )
+        search_text(response, &self.regex.session.csrf)
+            .ok_or_else(|| Error::new(Kind::CSRF(regex_mismatch(None)), None))
     }
     pub(super) async fn get_csrf(&self, url: &str) -> Result<String> {
-        self.find_csrf(&self.client.get(url).send().await?.text().await?)
+        self.find_csrf(
+            &self
+                .client
+                .get(url)
+                .send()
+                .await
+                .map_err(csrf_network_error)?
+                .text()
+                .await
+                .map_err(csrf_network_error)?,
+        )
     }
 
     pub async fn login(&self, password: &str) -> Result<()> {
@@ -98,22 +113,24 @@ impl Session {
                 .text()
                 .await
         })
-        .await?;
+        .await
+        .map_err(network_error)?;
         if self.regex.session.login.is_match(body.as_str()) {
             Ok(())
         } else {
-            Err(Error::new(String::from(
-                "Failed to log into codeforces.com",
-            )))
+            Err(Error::with_description(
+                Kind::API,
+                "Failed to login to codeforces.com",
+            ))
         }
     }
     pub async fn logout(&self) -> Result<()> {
-        let url = search_response_or(
+        let url = search_response(
             || self.client.get("https://codeforces.com"),
             &self.regex.session.logout,
-            "Logout url regex mismatch",
         )
-        .await?;
+        .await?
+        .ok_or_else(|| Error::new(Kind::Regex, Some(String::from("Can't find logout url"))))?;
         async_retry(async || {
             self.client
                 .get(format!("https://codeforces.com/{}/logout", url))
@@ -121,7 +138,8 @@ impl Session {
                 .await?
                 .error_for_status()
         })
-        .await?;
+        .await
+        .map_err(network_error)?;
         Ok(())
     }
 }

@@ -3,16 +3,14 @@ extern crate reqwest;
 extern crate tokio;
 
 use super::{
+    error::{Error, Kind, Result},
     problem::Problem,
     retry::async_retry,
-    search::{search_response, search_response_or},
+    search::search_response,
     session::Session,
     verdict::Verdict,
 };
-use crate::{
-    config::judge::{session::BFAA, submit::CHECK_DELAY},
-    types::{Error, Result},
-};
+use crate::config::judge::{session::BFAA, submit::CHECK_DELAY};
 use regex::Regex;
 use reqwest::Client;
 use std::collections::HashMap;
@@ -61,9 +59,9 @@ impl Submission {
         if data["verdict"].contains("verdict-waiting") {
             return Ok(None);
         } else {
-            let pos = data.remove("testCount").unwrap();
-            if pos.parse::<usize>().unwrap() != id {
-                return Err(Error::new(String::from("Test count not expected")));
+            let pos = data.remove("testCount").unwrap().parse::<usize>();
+            if pos != id {
+                return Err(Error::with_kind(Kind::TestCount(pos, id)));
             }
             return Ok(Some(Verdict {
                 input: full_data_or(data.remove(&format!("input#{}", pos)).unwrap()),
@@ -88,7 +86,7 @@ impl Session {
     pub async fn get_last_submission(&self, problem: &Problem) -> Result<Submission> {
         let csrf = self.get_csrf(problem.status_url.as_str()).await?;
         Ok(Submission {
-            id: search_response_or(
+            id: search_response(
                 || {
                     self.client
                         .post(&problem.status_url)
@@ -106,9 +104,9 @@ impl Session {
                         ])
                 },
                 &self.regex.submit.last_submit,
-                "Can't find last submission url",
             )
-            .await?,
+            .await?
+            .ok_or_else(|| Error::with_kind(Kind::Regex))?,
             client: self.client.clone(),
             csrf_token: csrf,
         })
@@ -137,6 +135,6 @@ impl Session {
             &self.regex.submit.submit,
         )
         .await?
-        .map_or(Ok(()), |x| Err(Error::new(x)))
+        .map_or(Ok(()), |x| Err(Error::with_description(Kind::API, x)))
     }
 }

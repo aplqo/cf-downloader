@@ -1,12 +1,13 @@
 extern crate regex;
 use regex::Regex;
 
-use super::{retry::async_retry, search::search_text_or, session::Session};
-use crate::{
-    config::judge::session::BFAA,
-    email::Email,
-    types::{Error, Result},
+use super::{
+    error::{network_error, Error, Kind, Result},
+    retry::async_retry,
+    search::search_text,
+    session::Session,
 };
+use crate::{config::judge::session::BFAA, email::Email};
 
 pub(super) struct RegexSet {
     name: Regex,
@@ -36,7 +37,8 @@ impl RegexSet {
         }
     }
     fn find_name(&self, response: &String) -> Result<String> {
-        search_text_or(response.as_str(), &self.name, "Can't find register name")
+        search_text(response.as_str(), &self.name)
+            .ok_or_else(|x| Error::with_description(Kind::Regex, "Can't find register name"))
     }
 }
 
@@ -50,7 +52,8 @@ impl Session {
                 .await?
                 .error_for_status()
         })
-        .await?;
+        .await
+        .map_err(network_error)?;
         Ok(())
     }
     pub async fn register(&self, password: &str, email: &Email) -> Result<()> {
@@ -65,7 +68,8 @@ impl Session {
                 .text()
                 .await
         })
-        .await?;
+        .await
+        .map_err(network_error)?;
         let csrf = self.find_csrf(&body)?;
         let name = regex.find_name(&body)?;
         async_retry(async || {
@@ -76,7 +80,8 @@ impl Session {
                 .await?
                 .error_for_status()
         })
-        .await?;
+        .await
+        .map_err(network_error)?;
         self.post_empty("", csrf.as_str()).await?;
         self.post_empty(self.ftaa.as_str(), csrf.as_str()).await?;
 
@@ -106,14 +111,22 @@ impl Session {
                 })
                 .await?,
             )
-            .map_or(Ok(()), |x| Err(Error::new(x)))?;
-        for p in email.wait_email_urls("noreply@codeforces.com").await? {
+            .map_or(Ok(()), |x| Err(Error::with_description(Kind::API, x)))?;
+        for p in email
+            .wait_email_urls("noreply@codeforces.com")
+            .await
+            .map_err(|x| Error::with_kind(Kind::Email(x)))?
+        {
             if p.contains("register") {
                 async_retry(async || self.client.get(p.as_str()).send().await?.error_for_status())
-                    .await?;
+                    .await
+                    .map_err(network_error)?;
                 return Ok(());
             }
         }
-        Err(Error::new("Can't find confirm address".to_string()))
+        Err(Error::with_description(
+            Kind::API,
+            "Can't find configm address",
+        ))
     }
 }

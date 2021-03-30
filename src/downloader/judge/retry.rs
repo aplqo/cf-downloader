@@ -1,10 +1,8 @@
 extern crate reqwest;
 extern crate tokio;
 
-use crate::{
-    config::retry::{FORBIDDEN_DELAY, RETRY_COUNT, RETRY_DELAY},
-    types::Result,
-};
+use crate::config::retry::{FORBIDDEN_DELAY, RETRY_COUNT, RETRY_DELAY};
+use reqwest::Result;
 use std::future::Future;
 use tokio::time::sleep;
 
@@ -25,8 +23,5 @@ where
             }
         }
     }
-    match fun().await {
-        Ok(v) => Ok(v),
-        Err(e) => Err(Box::new(e)),
-    }
+    fun().await
 }

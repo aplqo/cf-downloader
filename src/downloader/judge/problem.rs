@@ -1,7 +1,9 @@
 extern crate serde;
 
-use super::session::Session;
-use crate::types::Result;
+use super::{
+    error::{network_error, Result},
+    session::Session,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -46,8 +48,10 @@ impl Session {
                 .client
                 .get(&url)
                 .send()
-                .await?
-                .error_for_status()?
+                .await
+                .map_err(network_error)?
+                .error_for_status()
+                .map_err(network_error)?
                 .url()
                 .as_str())
     }
