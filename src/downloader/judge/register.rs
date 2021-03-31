@@ -5,7 +5,7 @@ use super::{
     error::{network_error, Error, Kind, Result},
     retry::async_retry,
     search::search_text,
-    session::Session,
+    Session,
 };
 use crate::{config::judge::session::BFAA, email::Email};
 

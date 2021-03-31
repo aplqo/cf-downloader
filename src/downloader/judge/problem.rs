@@ -2,9 +2,10 @@ extern crate serde;
 
 use super::{
     error::{network_error, Result},
-    session::Session,
+    Session,
 };
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Type {
@@ -33,6 +34,11 @@ impl Problem {
             contest,
             id,
         }
+    }
+}
+impl fmt::Display for Problem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Contest-{}{}", self.contest, self.id)
     }
 }
 

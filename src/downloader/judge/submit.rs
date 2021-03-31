@@ -7,8 +7,7 @@ use super::{
     problem::Problem,
     retry::async_retry,
     search::search_response,
-    session::Session,
-    verdict::Verdict,
+    Session, Verdict,
 };
 use crate::config::judge::{session::BFAA, submit::CHECK_DELAY};
 use regex::Regex;

@@ -5,7 +5,7 @@ use super::{
     error::{network_error, regex_mismatch, Error, Kind, Result},
     retry::async_retry,
     search::{search_response, search_text},
-    UtilityRegex,
+    Session, UtilityRegex,
 };
 use crate::{
     config::judge::session::{BFAA, VERBOSE},
@@ -35,13 +35,6 @@ fn csrf_network_error(error: reqwest::Error) -> Error {
     Error::new(Kind::CSRF(network_error(error)), None)
 }
 
-pub struct Session {
-    pub(super) client: reqwest::Client,
-    pub handle: String,
-    pub online: bool,
-    pub(super) ftaa: String,
-    pub(super) regex: UtilityRegex,
-}
 impl Session {
     fn from_client(builder: ClientBuilder) -> Self {
         Session {
