@@ -5,7 +5,7 @@ extern crate tokio;
 use crate::{
     config::register::{HANDLE_LEN, PASSWORD_LEN, REGISTER_DELAY},
     email::{self, Email},
-    judge::{self, session::Session},
+    judge::{self, Session},
     random::random_hex,
 };
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,7 @@ use tokio::time::sleep;
 #[derive(Debug)]
 pub enum RegisterError {
     Email(email::Error),
-    Judge(judge::error::Error),
+    Judge(judge::Error),
 }
 impl fmt::Display for RegisterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
