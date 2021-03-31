@@ -121,6 +121,7 @@ impl Session {
                 async_retry(async || self.client.get(p.as_str()).send().await?.error_for_status())
                     .await
                     .map_err(network_error)?;
+                self.online = true;
                 return Ok(());
             }
         }
