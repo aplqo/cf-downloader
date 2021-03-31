@@ -8,7 +8,6 @@ use super::{
     UtilityRegex,
 };
 use crate::{
-    account::Account,
     config::judge::session::{BFAA, VERBOSE},
     random::random_hex,
 };
@@ -39,6 +38,7 @@ fn csrf_network_error(error: reqwest::Error) -> Error {
 pub struct Session {
     pub(super) client: reqwest::Client,
     pub handle: String,
+    pub online: bool,
     pub(super) ftaa: String,
     pub(super) regex: UtilityRegex,
 }
@@ -52,6 +52,7 @@ impl Session {
                 .build()
                 .unwrap(),
             handle: String::new(),
+            online: false,
             ftaa: random_hex(18),
             regex: UtilityRegex::new(),
         }
@@ -59,8 +60,8 @@ impl Session {
     pub fn new() -> Self {
         Self::from_client(Client::builder())
     }
-    pub async fn from_account(login: Account) -> Result<Self> {
-        let ret = if let Some(p) = login.proxy {
+    pub fn with_proxy(proxy: Option<String>) -> Result<Self> {
+        Ok(if let Some(p) = proxy {
             Self::from_client(
                 Client::builder()
                     .proxy(Proxy::https(p))
@@ -68,9 +69,7 @@ impl Session {
             )
         } else {
             Self::new()
-        };
-        ret.login(login.password.as_str()).await?;
-        Ok(ret)
+        })
     }
 
     pub(super) fn find_csrf(&self, response: &String) -> Result<String> {
@@ -91,8 +90,9 @@ impl Session {
         )
     }
 
-    pub async fn login(&self, password: &str) -> Result<()> {
+    pub async fn login(&mut self, handle: String, password: &str) -> Result<()> {
         const URL: &str = "https://codeforces.com/enter";
+        self.handle = handle;
         let csrf = self.get_csrf(URL).await?;
         let body = async_retry(async || {
             self.client
@@ -116,6 +116,7 @@ impl Session {
         .await
         .map_err(network_error)?;
         if self.regex.session.login.is_match(body.as_str()) {
+            self.online = true;
             Ok(())
         } else {
             Err(Error::with_description(
@@ -124,7 +125,10 @@ impl Session {
             ))
         }
     }
-    pub async fn logout(&self) -> Result<()> {
+    pub async fn logout(&mut self) -> Result<()> {
+        if !self.online {
+            return Ok(());
+        }
         let url = search_response(
             || self.client.get("https://codeforces.com"),
             &self.regex.session.logout,
@@ -140,6 +144,7 @@ impl Session {
         })
         .await
         .map_err(network_error)?;
+        self.online = false;
         Ok(())
     }
 }
