@@ -73,6 +73,7 @@ pub async fn register(
             Ok(_) => {
                 vec_ses.push(client);
                 vec_acc.push(cur);
+                client = Session::new();
             }
             Err(e) => {
                 return (Some((vec_acc, vec_ses)), Some(RegisterError::Judge(e)));
