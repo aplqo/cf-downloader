@@ -4,7 +4,12 @@ extern crate flate2;
 use crate::{encoding::traits::DataDecoder, types::TestMeta};
 use base64::{decode_config_buf, DecodeError};
 use flate2::read::GzDecoder;
-use std::{error::Error as StdError, fmt, io, io::Read, vec::Vec};
+use std::{
+    error::Error as StdError,
+    fmt,
+    io::{self, Read},
+    vec::Vec,
+};
 
 #[derive(Debug)]
 pub enum Error {

@@ -22,7 +22,7 @@ pub struct Meta<'a> {
     engine: Handlebars<'a>,
 }
 
-fn split_error(name: &str) -> Error {
+fn split_error(name: &'static str) -> Error {
     Error::Split(name)
 }
 fn next_usize(split: &mut SplitWhitespace, name: &'static str) -> Result<usize> {
@@ -63,9 +63,9 @@ impl<'a> traits::MetaEncoding<'a> for Meta<'a> {
     fn decode(message: Verdict) -> Result<TestMeta> {
         let mut p = message.output.split_whitespace();
         Ok(TestMeta {
-            size: next_usize(p, "size")?,
-            output_size: next_usize(p, "output_size")?,
-            compress_size: next_usize(p, "compress_size")?,
+            size: next_usize(&mut p, "size")?,
+            output_size: next_usize(&mut p, "output_size")?,
+            compress_size: next_usize(&mut p, "compress_size")?,
             data_id: DataId {
                 hash: p.next().ok_or_else(|| split_error("hash"))?.to_string(),
                 answer: message.answer,

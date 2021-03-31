@@ -60,6 +60,6 @@ impl<'a> traits::DataEncoder<'a> for Encoder<'a> {
                     ignore: &self.ignore,
                 },
             )
-            .map_error(rander_error)
+            .map_err(rander_error)
     }
 }
