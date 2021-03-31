@@ -57,8 +57,8 @@ pub struct Handle<'a, E: ErrType> {
     state: State<'a, E>,
 }
 
-impl<'a, Err: ErrType> Cache<'a> {
-    pub async fn submit<Fun>(
+impl<'a> Cache<'a> {
+    pub async fn submit<Fun, Err>(
         &mut self,
         id: SubmitKey,
         language: &str,
@@ -66,6 +66,7 @@ impl<'a, Err: ErrType> Cache<'a> {
     ) -> StdResult<Verdict, Error<Err>>
     where
         Fun: Fn(SubmitKey) -> StdResult<String, Err>,
+        Err: ErrType,
     {
         match self.cache.get(id) {
             Some(v) => Ok(v),
@@ -88,7 +89,7 @@ impl<'a, Err: ErrType> Cache<'a> {
             }
         }
     }
-    pub async fn submit_iter<Fun, Iter>(
+    pub async fn submit_iter<Fun, Iter, Err>(
         &self,
         iter: Iter,
         language: &str,
@@ -97,6 +98,7 @@ impl<'a, Err: ErrType> Cache<'a> {
     where
         Fun: Fn(SubmitKey) -> StdResult<String, Err>,
         Iter: IntoIterator<Item = SubmitKey>,
+        Err: ErrType,
     {
         let mut ret: Vec<Handle<'_, Err>> = vec![unsafe { MaybeUninit::uninit() }; iter.len()];
         let mut submit = Vec::new();
@@ -133,7 +135,7 @@ impl<'a, Err: ErrType> Cache<'a> {
             });
         return ret;
     }
-    pub async fn get_result(
+    pub async fn get_result<Err: ErrType>(
         &mut self,
         handles: Vec<Handle<'_, Err>>,
     ) -> Vec<StdResult<&Verdict, Error<Err>>> {

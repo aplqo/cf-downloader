@@ -25,7 +25,7 @@ pub struct Cache<'a> {
 }
 
 impl<'a> Cache<'a> {
-    pub fn new(problem: &'a Problem, submitter: &mut Submitter) -> Self {
+    pub fn new(problem: &'a Problem, submitter: &'a mut Submitter) -> Self {
         Self {
             problem,
             submitter,
