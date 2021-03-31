@@ -1,12 +1,13 @@
 use crate::{
     encoding::Template,
-    judge::verdict::Verdict,
+    error::Error,
+    judge::Verdict,
     types::{DataId, TestMeta},
 };
 
 pub trait MetaEncoding<'a>: Sized
 where
-    Self::Error: std::error::Error,
+    Self::Error: Error,
 {
     type Error;
     fn new(template: &Template, max_ignore: usize) -> Result<Self, Self::Error>;
@@ -18,7 +19,7 @@ where
 
 pub trait DataEncoder<'a>: Sized
 where
-    Self::Error: std::error::Error,
+    Self::Error: Error,
 {
     type Error;
     fn new(template: &Template, max_ignore: usize) -> Result<Self, Self::Error>;
@@ -30,7 +31,7 @@ where
 
 pub trait DataDecoder: Sized
 where
-    Self::Error: std::error::Error,
+    Self::Error: Error,
 {
     type Error;
     fn new() -> Self;

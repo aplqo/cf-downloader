@@ -1,10 +1,14 @@
 pub mod gzip;
 pub mod handlebars {
     pub mod encode;
-    pub mod error;
+    mod error;
     pub mod meta;
+
+    pub use error::{Error, Result};
 }
-pub mod traits;
+mod traits;
+
+pub use traits::{DataDecoder, DataEncoder, MetaEncoding};
 
 pub struct Template {
     pub language: String,

@@ -4,7 +4,7 @@ extern crate serde;
 use super::error::{rander_error, template_error, Error, Result};
 use crate::{
     encoding::{traits, Template},
-    judge::verdict::Verdict,
+    judge::Verdict,
     random::random_standard,
     types::{DataId, TestMeta},
 };

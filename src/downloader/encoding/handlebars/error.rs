@@ -4,7 +4,7 @@ use handlebars::{RenderError, TemplateError};
 use std::{error::Error as StdError, fmt, num::ParseIntError, result::Result as StdResult};
 
 #[derive(Debug)]
-pub(super) enum Error {
+pub enum Error {
     ParseInt(&'static str, ParseIntError),
     Template(TemplateError),
     Rander(RenderError),
@@ -31,7 +31,7 @@ impl StdError for Error {
     }
 }
 
-pub(super) type Result<T> = StdResult<T, Error>;
+pub type Result<T> = StdResult<T, Error>;
 
 pub(super) fn template_error(error: TemplateError) -> Error {
     Error::Template(error)
