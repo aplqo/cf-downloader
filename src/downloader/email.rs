@@ -2,7 +2,7 @@ extern crate reqwest;
 extern crate serde;
 extern crate tokio;
 
-use crate::{config::email::CHECK_DELAY, types::Result};
+use crate::config::email::CHECK_DELAY;
 use reqwest::Client;
 use serde::Deserialize;
 use std::vec::Vec;
@@ -10,6 +10,9 @@ use tokio::time::sleep;
 const ADDRESS_URL: &str = "https://10minutemail.net/address.api.php";
 const MAIL_URL: &str = "https://10minutemail.net/mail.api.php";
 const NEW_URL: &str = "https://10minutemail.net/new.html";
+
+pub(crate) type Error = reqwest::Error;
+pub(crate) type Result<T> = reqwest::Result<T>;
 
 #[derive(Deserialize)]
 struct MailEntry {
