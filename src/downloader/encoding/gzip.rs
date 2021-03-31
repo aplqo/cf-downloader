@@ -1,12 +1,39 @@
 extern crate base64;
 extern crate flate2;
 
-use crate::{
-    encoding::traits::DataDecoder,
-    types::{Result, TestMeta},
-};
+use crate::{encoding::traits::DataDecoder, types::TestMeta};
+use base64::{decode_config_buf, DecodeError};
 use flate2::read::GzDecoder;
-use std::{io::Read, vec::Vec};
+use std::{error::Error as StdError, fmt, io, io::Read, vec::Vec};
+
+#[derive(Debug)]
+pub enum Error {
+    Decode(DecodeError),
+    Decompress(io::Error),
+}
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::Decode(dec) => {
+                write!(f, "base64: ")?;
+                dec.fmt(f)
+            }
+            Error::Decompress(err) => {
+                write!(f, "gzip: ")?;
+                err.fmt(f)
+            }
+        }
+    }
+}
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            Error::Decode(x) => Some(x),
+            Error::Decompress(x) => Some(x),
+        }
+    }
+}
+type Result<T> = std::result::Result<T, Error>;
 
 pub struct Decoder {
     buffer: Vec<u8>,
@@ -15,6 +42,8 @@ pub struct Decoder {
 }
 
 impl DataDecoder for Decoder {
+    type Error = Error;
+
     fn new() -> Self {
         Decoder {
             buffer: Vec::new(),
@@ -35,10 +64,13 @@ impl DataDecoder for Decoder {
         self.decoded.clear();
     }
     fn decode(&mut self) -> Result<String> {
-        base64::decode_config_buf(&self.buffer, base64::STANDARD, &mut self.decoded)?;
+        decode_config_buf(&self.buffer, base64::STANDARD, &mut self.decoded)
+            .map_err(|x| Error::Decode(x))?;
         let mut ret = String::new();
         ret.reserve(self.output_size);
-        GzDecoder::new(self.decoded.as_slice()).read_to_string(&mut ret)?;
+        GzDecoder::new(self.decoded.as_slice())
+            .read_to_string(&mut ret)
+            .map_err(|x| Error::Decompress(x))?;
         Ok(ret)
     }
 }
