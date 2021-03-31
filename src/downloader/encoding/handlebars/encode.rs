@@ -1,7 +1,7 @@
 extern crate handlebars;
 extern crate serde;
 
-use super::error::{rander_error, template_error, Result};
+use super::error::{rander_error, template_error, Error, Result};
 use crate::{
     encoding::{traits, Template},
     random::random_standard,
@@ -26,6 +26,8 @@ pub struct Encoder<'a> {
 }
 
 impl<'a> traits::DataEncoder<'a> for Encoder<'a> {
+    type Error = Error;
+
     fn new(template: &Template, max: usize) -> Result<Self> {
         let mut ret = Encoder {
             random: 0,

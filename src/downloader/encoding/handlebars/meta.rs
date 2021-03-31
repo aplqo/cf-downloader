@@ -1,7 +1,7 @@
 extern crate handlebars;
 extern crate serde;
 
-use super::error::{rander_error, template_error, Error, Kind, Result};
+use super::error::{rander_error, template_error, Error, Result};
 use crate::{
     encoding::{traits, Template},
     judge::verdict::Verdict,
@@ -23,17 +23,19 @@ pub struct Meta<'a> {
 }
 
 fn split_error(name: &str) -> Error {
-    Error::new(Kind::Split(name))
+    Error::Split(name)
 }
 fn next_usize(split: &mut SplitWhitespace, name: &'static str) -> Result<usize> {
     split
         .next()
         .ok_or_else(|| split_error(name))?
         .parse()
-        .map_err(|x| Error::new(Kind::ParseInt(name, x)))
+        .map_err(|x| Error::ParseInt(name, x))
 }
 
 impl<'a> traits::MetaEncoding<'a> for Meta<'a> {
+    type Error = Error;
+
     fn new(template: &Template, max: usize) -> Result<Self> {
         let mut ret = Meta {
             param: MetaParam {
