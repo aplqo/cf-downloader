@@ -23,18 +23,9 @@ pub type Result<T> = StdResult<T, Error>;
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
-            Kind::Builder(err) => {
-                write!(f, "Error building client: ")?;
-                err.fmt(f)
-            }
-            Kind::Network(err) => {
-                write!(f, "Error sending request: ")?;
-                err.fmt(f)
-            }
-            Kind::CSRF(x) => {
-                write!(f, "Error getting csrf token: ")?;
-                x.fmt(f)
-            }
+            Kind::Builder(err) => write!(f, "Error building client: {}", err),
+            Kind::Network(err) => write!(f, "Error sending request: {}", err),
+            Kind::CSRF(x) => write!(f, "Error getting csrf token: {}", x),
             Kind::API => {
                 write!(f, "API request failed")?;
                 self.write_description(f)
@@ -43,10 +34,7 @@ impl fmt::Display for Error {
                 write!(f, "Regex not matched")?;
                 self.write_description(f)
             }
-            Kind::Email(err) => {
-                write!(f, "Email client: ")?;
-                err.fmt(f)
-            }
+            Kind::Email(err) => write!(f, "Email client: {}", err),
             Kind::TestCount(count, expect) => {
                 write!(f, "Test count not match. Expected {} got {}", expect, count)
             }

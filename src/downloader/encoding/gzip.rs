@@ -14,14 +14,8 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Decode(dec) => {
-                write!(f, "base64: ")?;
-                dec.fmt(f)
-            }
-            Error::Decompress(err) => {
-                write!(f, "gzip: ")?;
-                err.fmt(f)
-            }
+            Error::Decode(dec) => write!(f, "base64: {}", dec),
+            Error::Decompress(err) => write!(f, "gzip: {}", err),
         }
     }
 }
