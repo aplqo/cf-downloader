@@ -38,7 +38,7 @@ impl RegexSet {
     }
     fn find_name(&self, response: &String) -> Result<String> {
         search_text(response.as_str(), &self.name)
-            .ok_or_else(|x| Error::with_description(Kind::Regex, "Can't find register name"))
+            .ok_or_else(|| Error::with_description(Kind::Regex, "Can't find register name"))
     }
 }
 
@@ -56,7 +56,7 @@ impl Session {
         .map_err(network_error)?;
         Ok(())
     }
-    pub async fn register(&self, password: &str, email: &Email) -> Result<()> {
+    pub async fn register(&mut self, password: &str, email: &Email) -> Result<()> {
         let regex = RegexSet::new();
         const URL: &str = "https://codeforces.com/register";
         let body: String = async_retry(async || {
@@ -109,7 +109,8 @@ impl Session {
                         .text()
                         .await
                 })
-                .await?,
+                .await
+                .map_err(network_error)?,
             )
             .map_or(Ok(()), |x| Err(Error::with_description(Kind::API, x)))?;
         for p in email

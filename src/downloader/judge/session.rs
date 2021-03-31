@@ -13,6 +13,7 @@ use crate::{
 };
 use regex::Regex;
 use reqwest::{Client, ClientBuilder, Proxy};
+use std::boxed::Box;
 
 const FIREFOX_UA: &str = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0";
 
@@ -32,7 +33,7 @@ impl RegexSet {
 }
 
 fn csrf_network_error(error: reqwest::Error) -> Error {
-    Error::new(Kind::CSRF(network_error(error)), None)
+    Error::with_kind(Kind::CSRF(Box::new(network_error(error))))
 }
 
 impl Session {
@@ -57,8 +58,7 @@ impl Session {
         Ok(if let Some(p) = proxy {
             Self::from_client(
                 Client::builder()
-                    .proxy(Proxy::https(p))
-                    .map_err(|x| Error::new(Kind::Builder(x), None))?,
+                    .proxy(Proxy::https(p).map_err(|x| Error::with_kind(Kind::Builder(x)))?),
             )
         } else {
             Self::new()
@@ -67,7 +67,7 @@ impl Session {
 
     pub(super) fn find_csrf(&self, response: &String) -> Result<String> {
         search_text(response, &self.regex.session.csrf)
-            .ok_or_else(|| Error::new(Kind::CSRF(regex_mismatch(None)), None))
+            .ok_or_else(|| Error::with_kind(Kind::CSRF(Box::new(regex_mismatch(None)))))
     }
     pub(super) async fn get_csrf(&self, url: &str) -> Result<String> {
         self.find_csrf(
@@ -126,8 +126,9 @@ impl Session {
             || self.client.get("https://codeforces.com"),
             &self.regex.session.logout,
         )
-        .await?
-        .ok_or_else(|| Error::new(Kind::Regex, Some(String::from("Can't find logout url"))))?;
+        .await
+        .map_err(network_error)?
+        .ok_or_else(|| Error::with_description(Kind::Regex, "Can't find logout url"))?;
         async_retry(async || {
             self.client
                 .get(format!("https://codeforces.com/{}/logout", url))

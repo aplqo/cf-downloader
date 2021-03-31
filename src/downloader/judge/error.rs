@@ -13,6 +13,7 @@ pub(super) enum Kind {
     Email(email::Error),
     TestCount(usize, usize),
 }
+#[derive(Debug)]
 pub struct Error {
     kind: Kind,
     description: Option<String>,
@@ -47,7 +48,7 @@ impl StdError for Error {
             Kind::Builder(x) | Kind::Network(x) => Some(&x),
             Kind::CSRF(x) => Some(x.as_ref()),
             Kind::Email(e) => Some(&e),
-            Kind::API | Kind::Regex | Kind::TestCount(_) => None,
+            Kind::API | Kind::Regex | Kind::TestCount(_, _) => None,
         }
     }
 }
@@ -58,7 +59,7 @@ impl Error {
             description: None,
         }
     }
-    pub(super) fn with_description<T: Into<String>>(kind: Kind, description: T) {
+    pub(super) fn with_description<T: Into<String>>(kind: Kind, description: T) -> Self {
         Self {
             kind,
             description: Some(T::into(description)),

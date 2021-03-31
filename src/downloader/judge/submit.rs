@@ -3,7 +3,7 @@ extern crate reqwest;
 extern crate tokio;
 
 use super::{
-    error::{Error, Kind, Result},
+    error::{network_error, Error, Kind, Result},
     problem::Problem,
     retry::async_retry,
     search::search_response,
@@ -54,11 +54,12 @@ impl Submission {
                 .json::<HashMap<String, String>>()
                 .await
         })
-        .await?;
+        .await
+        .map_err(network_error)?;
         if data["verdict"].contains("verdict-waiting") {
             return Ok(None);
         } else {
-            let pos = data.remove("testCount").unwrap().parse::<usize>();
+            let pos: usize = data.remove("testCount").unwrap().parse().unwrap();
             if pos != id {
                 return Err(Error::with_kind(Kind::TestCount(pos, id)));
             }
@@ -104,7 +105,8 @@ impl Session {
                 },
                 &self.regex.submit.last_submit,
             )
-            .await?
+            .await
+            .map_err(network_error)?
             .ok_or_else(|| Error::with_kind(Kind::Regex))?,
             client: self.client.clone(),
             csrf_token: csrf,
@@ -133,7 +135,8 @@ impl Session {
             },
             &self.regex.submit.submit,
         )
-        .await?
+        .await
+        .map_err(network_error)?
         .map_or(Ok(()), |x| Err(Error::with_description(Kind::API, x)))
     }
 }
