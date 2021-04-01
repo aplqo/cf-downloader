@@ -38,9 +38,10 @@ impl AccountList {
     pub(super) async fn get(&mut self) -> usize {
         let account = self.heap.pop().unwrap().0;
         sleep_until(max(account.next_submit, self.next_submit)).await;
-        self.next_submit += SUBMIT_DELAY;
+        let now = Instant::now();
+        self.next_submit = now + SUBMIT_DELAY;
         self.heap.push(Reverse(AccountNode {
-            next_submit: account.next_submit + DELAY_PER_ACCOUNT,
+            next_submit: now + DELAY_PER_ACCOUNT,
             id: account.id,
         }));
         account.id

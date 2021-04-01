@@ -6,15 +6,15 @@ use super::{
 };
 use crate::{
     config::submitter::SUBMISSION_GET_DELAY,
-    judge::{problem::Problem, submit::Submission, Result as JudgeResult, Session},
+    judge::{problem::Problem, submit::Submission, Session},
 };
 use std::mem::{take, MaybeUninit};
 use tokio::{
-    task::{spawn, JoinHandle},
+    task::{spawn_local, JoinHandle},
     time::sleep,
 };
 
-async fn get_last_submission(session: &Session, problem: &Problem) -> Result<Submission> {
+async fn get_last_submission<'a>(session: &'a Session, problem: &'a Problem) -> Result<Submission> {
     sleep(SUBMISSION_GET_DELAY).await;
     session
         .get_last_submission(problem)
@@ -25,7 +25,12 @@ async fn get_last_submission(session: &Session, problem: &Problem) -> Result<Sub
             handle: session.handle.clone(),
         })
 }
-async fn submit(session: &Session, problem: &Problem, language: &str, code: &str) -> Result<()> {
+async fn submit<'a>(
+    session: &Session,
+    problem: &Problem,
+    language: &str,
+    code: &str,
+) -> Result<()> {
     session
         .submit(problem, language, code)
         .await
@@ -36,16 +41,16 @@ async fn submit(session: &Session, problem: &Problem, language: &str, code: &str
         })
 }
 async fn get_result(
-    handle: JoinHandle<JudgeResult<Submission>>,
+    handle: JoinHandle<Result<Submission>>,
     session: &Session,
 ) -> Result<Submission> {
     match handle.await {
         Ok(v) => v,
-        Err(e) => Error {
+        Err(e) => Err(Error {
             operate: Operate::GetSubmission,
             kind: Kind::Join(e),
             handle: session.handle.clone(),
-        },
+        }),
     }
 }
 
@@ -58,7 +63,7 @@ impl Submitter {
     ) -> Result<Submission> {
         let account = &self.session[self.list.get().await];
         submit(account, problem, language, code).await?;
-        get_last_submission(account, problem)
+        get_last_submission(account, problem).await
     }
 
     pub async fn submit_iter<It: IntoIterator<Item = String>>(
@@ -68,23 +73,34 @@ impl Submitter {
         code: It,
     ) -> Vec<Result<Submission>> {
         let mut last = Vec::new();
-        let mut result = Vec::new();
-        last.resize(self.session.len(), None);
-        result.resize(code.len(), unsafe { MaybeUninit::uninit().assume_init() });
+        let mut result: Vec<Result<Submission>> = Vec::new();
+        last.resize_with(self.session.len(), || None);
         for (index, code) in code.into_iter().enumerate() {
             let id = self.list.get().await;
             let account = &self.session[id];
             if let Some((index, r)) = take(&mut last[id]) {
                 result[index] = get_result(r, account).await;
             }
-            match submit(account, problem, language, code).await {
-                Ok(_) => last[id] = Some((index, spawn(get_last_submission(account, problem)))),
+            result.push(unsafe { MaybeUninit::uninit().assume_init() });
+            match submit(account, problem, language, code.as_str()).await {
+                Ok(_) => {
+                    last[id] = {
+                        let account_ptr: *const Session = account;
+                        let problem_ptr: *const Problem = problem;
+                        Some((
+                            index,
+                            spawn_local(unsafe {
+                                get_last_submission(&*account_ptr, &*problem_ptr)
+                            }),
+                        ))
+                    }
+                }
                 Err(e) => result[index] = Err(e),
             }
         }
-        for (id, val) in last.iter().enumerate() {
+        for (id, val) in last.into_iter().enumerate() {
             if let Some((index, r)) = val {
-                result[index] = get_result(r, &self.session[id]);
+                result[index] = get_result(r, &self.session[id]).await;
             }
         }
         result

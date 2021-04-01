@@ -29,7 +29,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
             Kind::Join(x) => write!(f, "Error joining task using {}: {}", self.handle, x),
-            Kind::Judge(handle, x) => {
+            Kind::Judge(x) => {
                 write!(
                     f,
                     "Error while {} using {}: {}",
@@ -41,14 +41,14 @@ impl fmt::Display for Error {
 }
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        match self {
+        match &self.kind {
             Kind::Join(x) => Some(x),
             Kind::Judge(x) => Some(x),
         }
     }
 }
 impl fmt::Display for Operate {
-    fn fmt(self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::BuildClient => f.write_str("building client"),
             Self::Login => f.write_str("login"),
