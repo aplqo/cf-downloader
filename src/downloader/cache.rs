@@ -5,7 +5,7 @@ use crate::{
     submitter::Submitter,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, rc::Rc};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SubmitKey {
@@ -19,13 +19,13 @@ impl fmt::Display for SubmitKey {
 }
 
 pub struct Cache<'a> {
-    problem: &'a Problem,
-    submitter: &'a mut Submitter,
+    problem: Rc<Problem>,
+    pub(crate) submitter: &'a mut Submitter,
     cache: HashMap<SubmitKey, Verdict>,
 }
 
 impl<'a> Cache<'a> {
-    pub fn new(problem: &'a Problem, submitter: &'a mut Submitter) -> Self {
+    pub fn new(problem: Rc<Problem>, submitter: &'a mut Submitter) -> Self {
         Self {
             problem,
             submitter,

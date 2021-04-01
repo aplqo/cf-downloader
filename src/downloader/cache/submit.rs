@@ -73,7 +73,7 @@ impl<'a> Cache<'a> {
                 id,
                 self.submitter
                     .submit(
-                        self.problem,
+                        &self.problem,
                         language,
                         generate(id)
                             .map_err(|e| Error::new(id, Kind::Generate(e)))?
@@ -105,7 +105,7 @@ impl<'a> Cache<'a> {
         let cache = &self.cache;
         self.submitter
             .submit_iter(
-                self.problem,
+                &self.problem,
                 language,
                 iter.into_iter().enumerate().filter_map(|(index, id)| {
                     ret.push(Handle {
