@@ -19,9 +19,9 @@ pub(super) enum Kind {
 }
 #[derive(Debug)]
 pub struct Error {
-    operate: Operate,
-    kind: Kind,
-    handle: String,
+    pub(super) operate: Operate,
+    pub(super) kind: Kind,
+    pub(super) handle: String,
 }
 pub type Result<T> = StdResult<T, Error>;
 
