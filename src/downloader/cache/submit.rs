@@ -8,22 +8,22 @@ use crate::{
 };
 use futures::future::join_all;
 use std::{
-    error::Error as StdError, fmt, iter::IntoIterator, mem::MaybeUninit,
+    collections::HashMap, error::Error as StdError, fmt, iter::IntoIterator, mem::MaybeUninit,
     result::Result as StdResult,
 };
 
 #[derive(Debug)]
-enum Kind<E: ErrType> {
+enum Kind<E: 'static + ErrType> {
     Submit(submitter::Error),
     GetResult(judge::Error),
     Generate(E),
 }
 #[derive(Debug)]
-pub struct Error<E: ErrType> {
+pub struct Error<E: 'static + ErrType> {
     kind: Kind<E>,
     id: SubmitKey,
 }
-impl<E: ErrType> fmt::Display for Error<E> {
+impl<E: 'static + ErrType> fmt::Display for Error<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
             Kind::Submit(err) => write!(f, "Error submiting {}: {}", self.id, err),
@@ -32,9 +32,9 @@ impl<E: ErrType> fmt::Display for Error<E> {
         }
     }
 }
-impl<E: ErrType> StdError for Error<E> {
+impl<E: 'static + ErrType> StdError for Error<E> {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        match self {
+        match &self.kind {
             Kind::Submit(err) => Some(err),
             Kind::GetResult(err) => Some(err),
             Kind::Generate(err) => Some(err),
@@ -47,70 +47,74 @@ impl<E: ErrType> Error<E> {
     }
 }
 
-enum State<'a, E: ErrType> {
-    Hit(&'a Verdict),
+enum State<E: 'static + ErrType> {
+    Hit,
     Miss(Submission),
     Error(Kind<E>),
 }
-pub struct Handle<'a, E: ErrType> {
+pub struct Handle<E: 'static + ErrType> {
     id: SubmitKey,
-    state: State<'a, E>,
+    state: State<E>,
 }
 
 impl<'a> Cache<'a> {
     pub async fn submit<Fun, Err>(
-        &mut self,
+        &'a mut self,
         id: SubmitKey,
         language: &str,
         generate: Fun,
-    ) -> StdResult<Verdict, Error<Err>>
+    ) -> StdResult<&'a Verdict, Error<Err>>
     where
         Fun: Fn(SubmitKey) -> StdResult<String, Err>,
-        Err: ErrType,
+        Err: 'static + ErrType,
     {
-        match self.cache.get(id) {
-            Some(v) => Ok(v),
-            None => {
-                self.cache.insert(
-                    id,
-                    self.submitter
-                        .submit(
-                            self.problem,
-                            language,
-                            generate(id).map_err(|e| Error::new(id, Kind::Generate(e)))?,
-                        )
-                        .await
-                        .map_err(|e| Error::new(id, Kind::Submit(e)))?
-                        .wait(id.offset)
-                        .await
-                        .map_err(|e| Error::new(id, Kind::GetResult(e)))?,
-                );
-                Ok(self.cache.get(id).unwrap())
-            }
+        if !self.cache.contains_key(&id) {
+            self.cache.insert(
+                id,
+                self.submitter
+                    .submit(
+                        self.problem,
+                        language,
+                        generate(id)
+                            .map_err(|e| Error::new(id, Kind::Generate(e)))?
+                            .as_str(),
+                    )
+                    .await
+                    .map_err(|e| Error::new(id, Kind::Submit(e)))?
+                    .wait(id.test)
+                    .await
+                    .map_err(|e| Error::new(id, Kind::GetResult(e)))?,
+            );
         }
+        Ok(self.cache.get(&id).unwrap())
     }
+
     pub async fn submit_iter<Fun, Iter, Err>(
-        &self,
+        &mut self,
         iter: Iter,
         language: &str,
         generate: Fun,
-    ) -> Vec<Handle<'_, Err>>
+    ) -> Vec<Handle<Err>>
     where
         Fun: Fn(SubmitKey) -> StdResult<String, Err>,
         Iter: IntoIterator<Item = SubmitKey>,
-        Err: ErrType,
+        Err: ErrType + 'static,
     {
-        let mut ret: Vec<Handle<'_, Err>> = vec![unsafe { MaybeUninit::uninit() }; iter.len()];
+        let mut ret: Vec<Handle<Err>> = Vec::new();
         let mut submit = Vec::new();
+        let cache = &self.cache;
         self.submitter
             .submit_iter(
                 self.problem,
                 language,
                 iter.into_iter().enumerate().filter_map(|(index, id)| {
-                    ret[index].id = id;
-                    match self.cache.get(id) {
+                    ret.push(Handle {
+                        id,
+                        state: unsafe { MaybeUninit::uninit().assume_init() },
+                    });
+                    match cache.get(&id) {
                         Some(v) => {
-                            ret[index].state = State::Hit(v);
+                            ret[index].state = State::Hit;
                             None
                         }
                         None => match generate(id) {
@@ -133,23 +137,36 @@ impl<'a> Cache<'a> {
                 Ok(s) => ret[id].state = State::Miss(s),
                 Err(e) => ret[id].state = State::Error(Kind::Submit(e)),
             });
-        return ret;
+        ret
     }
-    pub async fn get_result<Err: ErrType>(
-        &mut self,
-        handles: Vec<Handle<'_, Err>>,
-    ) -> Vec<StdResult<&Verdict, Error<Err>>> {
-        join_all(handles.into_iter().map(async move |x| match x.state {
-            State::Hit(v) => Ok(v),
-            State::Miss(s) => match s.wait(x.id.time).await {
-                Ok(v) => {
-                    self.cache.insert(x.id, v);
-                    Ok(self.cache.get(x.id).unwrap())
-                }
-                Err(e) => Err(Error::new(x.id, Kind::GetResult(e))),
-            },
-            State::Error(e) => Err(Error::new(x.id, e)),
-        }))
-        .await
+    pub async fn get_result<Err: ErrType + 'static>(
+        &'a mut self,
+        mut handles: Vec<Handle<Err>>,
+    ) -> Vec<StdResult<&'a Verdict, Error<Err>>> {
+        {
+            let cache: *mut HashMap<SubmitKey, Verdict> = &mut self.cache;
+            unsafe {
+                join_all(handles.iter_mut().map(async move |x| {
+                    if let State::Miss(s) = &x.state {
+                        match s.wait(x.id.time).await {
+                            Ok(v) => {
+                                (*cache).insert(x.id, v);
+                            }
+                            Err(e) => x.state = State::Error(Kind::GetResult(e)),
+                        }
+                    };
+                }))
+            }
+            .await;
+        }
+        let cache = &self.cache;
+        handles
+            .into_iter()
+            .map(|x| match x.state {
+                State::Hit => Ok(cache.get(&x.id).unwrap()),
+                State::Error(e) => Err(Error::new(x.id, e)),
+                State::Miss(_) => Ok(cache.get(&x.id).unwrap()),
+            })
+            .collect()
     }
 }

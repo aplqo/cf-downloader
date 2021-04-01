@@ -51,7 +51,7 @@ impl<'a> Cache<'a> {
     pub fn save<W: Write>(&self, wr: W) -> Result<(), StoageError> {
         to_writer(
             wr,
-            SaveContent {
+            &SaveContent {
                 problem: self.problem,
                 content: &self.cache,
             },
@@ -60,7 +60,7 @@ impl<'a> Cache<'a> {
     }
     pub fn load<R: Read>(&mut self, rdr: R) -> Result<(), StoageError> {
         let val: LoadContent = from_reader(rdr).map_err(|x| StoageError::Yaml(x))?;
-        if val.problem != self.problem {
+        if self.problem != &val.problem {
             Err(StoageError::Mismatch(self.problem.clone(), val.problem))
         } else {
             self.cache = val.content;

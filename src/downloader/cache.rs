@@ -7,7 +7,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt};
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SubmitKey {
     pub test: usize,
     pub time: usize,
