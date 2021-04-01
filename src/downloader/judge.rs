@@ -7,8 +7,10 @@ mod retry;
 mod search;
 pub mod session;
 pub mod submit;
+pub mod verdict;
 
 pub use error::{Error, Result};
+pub use verdict::Verdict;
 
 struct UtilityRegex {
     session: session::RegexSet,
@@ -29,10 +31,4 @@ pub struct Session {
     pub online: bool,
     ftaa: String,
     regex: UtilityRegex,
-}
-
-pub struct Verdict {
-    pub(crate) input: Option<String>,
-    pub(crate) output: String,
-    pub(crate) answer: Option<String>,
 }
