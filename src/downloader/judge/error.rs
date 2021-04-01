@@ -23,7 +23,7 @@ pub type Result<T> = StdResult<T, Error>;
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.kind {
+        match &self.kind {
             Kind::Builder(err) => write!(f, "Error building client: {}", err),
             Kind::Network(err) => write!(f, "Error sending request: {}", err),
             Kind::CSRF(x) => write!(f, "Error getting csrf token: {}", x),
@@ -44,10 +44,10 @@ impl fmt::Display for Error {
 }
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        match self.kind {
-            Kind::Builder(x) | Kind::Network(x) => Some(&x),
+        match &self.kind {
+            Kind::Builder(x) | Kind::Network(x) => Some(x),
             Kind::CSRF(x) => Some(x.as_ref()),
-            Kind::Email(e) => Some(&e),
+            Kind::Email(e) => Some(e),
             Kind::API | Kind::Regex | Kind::TestCount(_, _) => None,
         }
     }
@@ -66,7 +66,7 @@ impl Error {
         }
     }
     fn write_description(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(d) = self.description {
+        if let Some(d) = &self.description {
             write!(f, ": {}", d)
         } else {
             Ok(())

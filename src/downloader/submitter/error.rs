@@ -27,7 +27,7 @@ pub type Result<T> = StdResult<T, Error>;
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.kind {
+        match &self.kind {
             Kind::Join(x) => write!(f, "Error joining task using {}: {}", self.handle, x),
             Kind::Judge(x) => {
                 write!(

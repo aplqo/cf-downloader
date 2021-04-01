@@ -25,7 +25,7 @@ pub struct Error<E: 'static + ErrType> {
 }
 impl<E: 'static + ErrType> fmt::Display for Error<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.kind {
+        match &self.kind {
             Kind::Submit(err) => write!(f, "Error submiting {}: {}", self.id, err),
             Kind::GetResult(err) => write!(f, "Error getting result for {}: {}", self.id, err),
             Kind::Generate(err) => write!(f, "Error generate code for {}: {}", self.id, err),
@@ -113,7 +113,7 @@ impl<'a> Cache<'a> {
                         state: unsafe { MaybeUninit::uninit().assume_init() },
                     });
                     match cache.get(&id) {
-                        Some(v) => {
+                        Some(_) => {
                             ret[index].state = State::Hit;
                             None
                         }
