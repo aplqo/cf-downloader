@@ -133,7 +133,7 @@ impl<'a> Cache<'a> {
             .await
             .into_iter()
             .zip(submit)
-            .map(|(v, id)| match v {
+            .for_each(|(v, id)| match v {
                 Ok(s) => ret[id].state = State::Miss(s),
                 Err(e) => ret[id].state = State::Error(Kind::Submit(e)),
             });
