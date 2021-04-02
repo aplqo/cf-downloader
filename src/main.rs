@@ -1,330 +1,35 @@
 #![feature(try_blocks)]
+#![feature(nll)]
 extern crate clap;
 extern crate pretty_env_logger;
 extern crate termcolor;
+extern crate tokio;
 
-use cf_downloader::{
-    account::{self, Account},
-    downloader::{Callback, Downloader},
-    encoding::{
-        gzip::Decoder,
-        handlebars::{encode::Encoder, meta::Meta},
-        Template,
-    },
-    judge::{
-        problem::{Problem, Type},
-        session::Session,
-    },
-    submitter::Submitter,
-    types::Result,
-};
+use cf_downloader::{judge::Session, submitter::Submitter};
 use clap::{crate_description, crate_name, App, Arg};
 use pretty_env_logger::init_timed;
-use std::{
-    fs::File,
-    io::{stdin, Read, Write},
-    path::Path,
+use std::{fs::File, io::Write};
+use termcolor::{Color, ColorChoice, StandardStream, WriteColor};
+
+#[macro_use]
+mod color;
+mod command {
+    pub mod problem;
+    pub mod session;
+}
+mod read;
+mod write;
+
+use command::{
+    problem::problem_loop,
+    session::{login, logout, register},
 };
-use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
-use tokio::runtime::Runtime;
-
-macro_rules! get_version {
-    ($file:expr) => {
-        concat!(
-            env!("CARGO_PKG_VERSION"),
-            " ",
-            include_str!(concat!(env!("OUT_DIR"), "/", $file))
-        )
-    };
-}
-
-fn set_fg(stdout: &mut StandardStream, color: Color) {
-    stdout
-        .set_color(ColorSpec::new().set_fg(Some(color)).set_intense(true))
-        .expect("Error: can't set output color");
-}
-fn reset_fg(stdout: &mut StandardStream) {
-    stdout
-        .set_color(ColorSpec::new().set_fg(None).set_intense(true))
-        .expect("Error: Can't reset color");
-}
-macro_rules! write_color {
-    ($dest:expr, $color:expr,$typ:expr,  $($arg:tt)*) => { {
-        set_fg($dest, $color);
-        write!($dest,"{:>7}: ", $typ);
-        reset_fg($dest);
-        writeln!($dest, $($arg)*).expect("Failed to write output");
-    }
-    };
-}
-macro_rules! write_error {
-    ($dest:expr,$typ:expr, $($arg:tt)*) => {
-        write_color!($dest, Color::Red, $typ, $($arg)*);
-    };
-}
-macro_rules! write_info {
-    ($dest:expr,$typ:expr, $($arg:tt)*) => {
-        write_color!($dest, Color::Blue, $typ, $($arg)*);
-    };
-}
-macro_rules! write_ok {
-    ($dest:expr,$typ:expr, $($arg:tt)*) => {
-        write_color!($dest, Color::Green, $typ, $($arg)*);
-    };
-}
-macro_rules! write_progress {
-    ($dest:expr, $typ:expr, $($arg:tt)*) => {
-        write_color!($dest, Color::Cyan, $typ, $($arg)*);
-    };
-}
+use read::{read_line, read_reader};
 
 #[allow(unused_must_use)]
-fn read_line_to(stdout: &mut StandardStream, prompt: &[u8], dest: &mut String) {
-    dest.clear();
-    loop {
-        stdout.write(prompt);
-        stdout.flush();
-        match stdin().read_line(dest) {
-            Ok(_) => {
-                dest.truncate(dest.trim_end().len());
-                return;
-            }
-            Err(e) => write_error!(stdout, "Error", "Read: {}", e.to_string()),
-        }
-        stdout.reset();
-    }
-}
-fn read_line(stdout: &mut StandardStream, prompt: &[u8]) -> String {
-    let mut ret = String::new();
-    read_line_to(stdout, prompt, &mut ret);
-    ret
-}
-#[allow(unused_must_use)]
-fn read_usize(stdout: &mut StandardStream, prompt: &[u8], min: usize, max: usize) -> usize {
-    let mut buf = String::new();
-    loop {
-        read_line_to(stdout, prompt, &mut buf);
-        match buf.parse::<usize>() {
-            Ok(v) => {
-                if v < min || v >= max {
-                    write_error!(
-                        stdout,
-                        "Error",
-                        "parse: Value {} out of range. Expected value in [{}, {})",
-                        v,
-                        min,
-                        max
-                    );
-                } else {
-                    return v;
-                }
-            }
-            Err(e) => write_error!(stdout, "Error", "parse: {}", e.to_string()),
-        };
-        stdout.reset();
-    }
-}
-#[allow(unused_must_use)]
-fn read_problem(stdout: &mut StandardStream, session: &Session, rt: &Runtime) -> Problem {
-    let mut contest = String::new();
-    let mut id = String::new();
-    loop {
-        read_line_to(stdout, b"Contest: ", &mut contest);
-        read_line_to(stdout, b"Problem id: ", &mut id);
-        match rt.block_on(async { session.check_exist(Type::Contest, &contest, &id).await }) {
-            Ok(true) => return Problem::new(Type::Contest, contest, id),
-            Ok(false) => write_error!(stdout, "Error", "No such problem or contest."),
-            Err(e) => write_error!(stdout, "Error", "Get problem: {}", e.to_string()),
-        }
-        stdout.reset();
-    }
-}
-#[allow(unused_must_use)]
-fn read_template(stdout: &mut StandardStream) -> Template {
-    let lang = read_line(stdout, b"Language: ");
-    let mut path = String::new();
-    let mut content = String::new();
-    loop {
-        read_line_to(stdout, b"File path: ", &mut path);
-        match File::open(&path).and_then(|mut f: File| f.read_to_string(&mut content)) {
-            Ok(_) => {
-                return Template {
-                    language: lang,
-                    content,
-                };
-            }
-            Err(e) => write_error!(stdout, "Error", "read file: {}", e.to_string()),
-        }
-        stdout.reset();
-    }
-}
-
-struct GetMetaCall<'a> {
-    stdout: &'a mut StandardStream,
-}
-impl<'a> Callback for GetMetaCall<'a> {
-    #[allow(unused_must_use)]
-    fn on_case_begin(&mut self, id: usize) {
-        write_progress!(self.stdout, "Start", "Get meta data for test {}", id);
-    }
-    #[allow(unused_must_use)]
-    fn on_case_end(&mut self, id: usize) {
-        write_ok!(self.stdout, "Finish", "Got meta data for test {}", id);
-    }
-}
-struct GetDataCall<'a> {
-    stdout: &'a mut StandardStream,
-}
-impl<'a> Callback for GetDataCall<'a> {
-    #[allow(unused_must_use)]
-    fn on_case_begin(&mut self, id: usize) {
-        write_progress!(self.stdout, "Start", "Get input for test {}", id);
-    }
-    #[allow(unused_must_use)]
-    fn on_progress(&mut self, id: usize, current: usize, total: usize) {
-        write_info!(
-            self.stdout,
-            "Info",
-            "Got {} of {} data segment for test {}",
-            current,
-            total,
-            id
-        );
-    }
-    #[allow(unused_must_use)]
-    fn on_case_end(&mut self, id: usize) {
-        write_ok!(self.stdout, "Finish", "Get data for test {}", id);
-    }
-}
-
-#[allow(unused_must_use)]
-fn problem_loop(
-    stdout: &mut StandardStream,
-    session: &Session,
-    submitter: &mut Submitter,
-    rt: &Runtime,
-) {
-    let problem = read_problem(stdout, session, rt);
-    write_info!(
-        stdout,
-        "Info",
-        "Selected problem {}{}",
-        problem.contest,
-        problem.id
-    );
-    stdout.reset();
-    let prompt = format!("cf-downloader [{} {}]> ", problem.contest, problem.id);
-    let mut downloader: Downloader = Downloader::new(problem);
-    loop {
-        match read_line(stdout, prompt.as_bytes()).trim() {
-            "get_meta" => {
-                let cnt = read_usize(stdout, b"Until: ", 0, usize::MAX);
-                let template = read_template(stdout);
-                write_info!(stdout, "Info", "Loading {} more testcase's metadata", cnt);
-                if let Err(e) = rt.block_on(downloader.get_meta::<Meta, _>(
-                    submitter,
-                    &template,
-                    cnt,
-                    GetMetaCall { stdout },
-                )) {
-                    write_error!(stdout, "Fail", "{}", e.to_string());
-                } else {
-                    write_ok!(stdout, "Success", "Successfully getted metadata");
-                }
-            }
-            "unselect" => {
-                write_info!(stdout, "Info", "Unselected problem");
-                break;
-            }
-            "get_data" => {
-                if downloader.is_empty() {
-                    write_error!(stdout, "Error", "No metadata");
-                } else {
-                    let begin = read_usize(stdout, b"Begin: ", 0, downloader.len());
-                    let end = read_usize(stdout, b"End: ", begin + 1, downloader.len() + 1);
-                    match rt.block_on(async {
-                        downloader
-                            .get_data::<Encoder, Decoder, _>(
-                                submitter,
-                                &read_template(stdout),
-                                begin,
-                                end,
-                                GetDataCall { stdout },
-                            )
-                            .await
-                    }) {
-                        Ok(v) => {
-                            for i in begin..end {
-                                if let Err(e) = File::create(format!("{}.in", i))
-                                    .and_then(|mut f: File| f.write(v[i - begin].as_bytes()))
-                                {
-                                    write_error!(stdout, "Fail", "write: {}", e.to_string());
-                                }
-                            }
-                        }
-                        Err(e) => write_error!(stdout, "Fail", "get_data: {}", e.to_string()),
-                    };
-                }
-            }
-            "load" => {
-                match downloader.load_meta(Path::new(read_line(stdout, b"File path: ").as_str())) {
-                    Ok(_) => write_ok!(stdout, "Success", "Loaded metadata"),
-                    Err(e) => write_error!(stdout, "Fail", "load: {}", e.to_string()),
-                }
-            }
-            "save" => {
-                match downloader.save_meta(Path::new(read_line(stdout, b"File path: ").as_str())) {
-                    Ok(_) => write_ok!(stdout, "Success", "Writed metadata to file"),
-                    Err(e) => write_error!(stdout, "Fail", "write: {}", e.to_string()),
-                }
-            }
-            unknown => write_error!(stdout, "Error", "problem: Unknown command {}", unknown),
-        }
-        stdout.reset();
-    }
-}
-#[allow(unused_must_use)]
-async fn login(submitter: &mut Submitter, stdout: &mut StandardStream, file: &str) {
-    write_info!(stdout, "Info", "Logging in...");
-    let p: Result<()> = try {
-        submitter
-            .login(account::from_reader(File::open(file)?)?)
-            .await?
-    };
-    if let Err(e) = p {
-        write_error!(stdout, "Error", "login: {}", e.to_string());
-    } else {
-        write_ok!(stdout, "Success", "Logged into codeforces.com");
-    }
-}
-#[allow(unused_must_use)]
-async fn register(stdout: &mut StandardStream) -> Result<Vec<Account>> {
-    let count = read_usize(stdout, b"Count: ", 1, usize::MAX);
-    let file = read_line(stdout, b"File path: ");
-    let wdr = File::create(file)?;
-    write_info!(stdout, "Info", "Registering {} account...", count);
-    let ret = account::register(count).await?;
-    write_ok!(stdout, "Success", "Registered {} account.", count);
-    account::to_writer(wdr, &ret)?;
-    Ok(ret)
-}
-#[allow(unused_must_use)]
-async fn logout(stdout: &mut StandardStream, submitter: &mut Submitter) {
-    write_info!(stdout, "Info", "Logging out from codeforces.com");
-    match submitter.logout().await {
-        Ok(_) => {
-            write_ok!(stdout, "Success", "Logged out from codeforces.com");
-        }
-        Err(e) => {
-            write_error!(stdout, "Error", "logout: {}", e.to_string());
-        }
-    }
-}
-
-#[allow(unused_must_use)]
-fn main() {
+#[tokio::main]
+async fn main() {
     init_timed();
-    let rt = Runtime::new().unwrap();
     let mut stdout = StandardStream::stdout(ColorChoice::Auto);
     let app = App::new(crate_name!())
         .about(crate_description!())
@@ -335,36 +40,37 @@ fn main() {
     let session = Session::new();
     let mut submit = Submitter::new();
     if let Some(f) = app.value_of("account") {
-        rt.block_on(login(&mut submit, &mut stdout, f));
+        match File::open(f) {
+            Ok(v) => login(&mut stdout, &mut submit, v).await,
+            Err(e) => write_error!(&mut stdout, "Error", "Error open {}: {}", f, e),
+        }
         stdout.reset();
     }
+    let stdout_ptr: *mut StandardStream = &mut stdout;
     loop {
         match read_line(&mut stdout, b"cf-downloader> ").trim() {
             "select" => {
                 if submit.is_empty() {
                     write_error!(&mut stdout, "Error", "No logined account!");
                 } else {
-                    problem_loop(&mut stdout, &session, &mut submit, &rt);
+                    problem_loop(&mut stdout, &session, &mut submit).await;
                 }
             }
             "exit" => break,
             "login" => {
-                let path = read_line(&mut stdout, b"File path: ");
-                rt.block_on(login(&mut submit, &mut stdout, path.as_str()));
+                login(
+                    &mut stdout,
+                    &mut submit,
+                    read_reader(unsafe { &mut *stdout_ptr }),
+                )
+                .await
             }
-            "register" => match rt.block_on(register(&mut stdout)) {
-                Ok(v) => {
-                    if let Err(e) = rt.block_on(submit.login(v)) {
-                        write_error!(&mut stdout, "Error", "login: {}", e.to_string());
-                    }
+            "register" => {
+                if let Some(v) = register(&mut stdout).await {
+                    submit.add_session(v);
                 }
-                Err(e) => {
-                    write_error!(&mut stdout, "Error", "register: {}", e.to_string());
-                }
-            },
-            "logout" => {
-                rt.block_on(logout(&mut stdout, &mut submit));
             }
+            "logout" => logout(&mut stdout, &mut submit).await,
             unknown => write_error!(
                 &mut stdout,
                 "Error",
@@ -374,6 +80,6 @@ fn main() {
         }
         stdout.reset();
     }
-    rt.block_on(logout(&mut stdout, &mut submit));
+    logout(&mut stdout, &mut submit).await;
     stdout.reset();
 }
