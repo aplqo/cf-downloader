@@ -5,6 +5,7 @@ extern crate tokio;
 use crate::config::email::CHECK_DELAY;
 use reqwest::Client;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::vec::Vec;
 use tokio::time::sleep;
 const ADDRESS_URL: &str = "https://10minutemail.net/address.api.php";
@@ -27,7 +28,7 @@ struct Response {
 
 #[derive(Deserialize)]
 struct Mail {
-    urls: Vec<String>,
+    urls: HashMap<String, String>,
 }
 pub struct Email {
     client: Client,
@@ -68,7 +69,10 @@ impl Email {
                         .error_for_status()?
                         .json::<Mail>()
                         .await?
-                        .urls);
+                        .urls
+                        .into_iter()
+                        .map(|(_, v)| v)
+                        .collect());
                 }
             }
             sleep(CHECK_DELAY).await;
