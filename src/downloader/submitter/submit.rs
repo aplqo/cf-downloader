@@ -81,6 +81,7 @@ impl Submitter {
             if let Some((index, r)) = take(&mut last[id]) {
                 result[index] = get_result(r, account).await;
             }
+            #[allow(clippy::uninit_assumed_init)]
             result.push(unsafe { MaybeUninit::uninit().assume_init() });
             match submit(account, problem, language, code.as_str()).await {
                 Ok(_) => {

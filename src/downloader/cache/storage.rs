@@ -56,10 +56,10 @@ impl<'a> Cache<'a> {
                 content: &self.cache,
             },
         )
-        .map_err(|e| StoageError::Yaml(e))
+        .map_err(StoageError::Yaml)
     }
     pub fn load<R: Read>(&mut self, rdr: R) -> Result<(), StoageError> {
-        let val: LoadContent = from_reader(rdr).map_err(|x| StoageError::Yaml(x))?;
+        let val: LoadContent = from_reader(rdr).map_err(StoageError::Yaml)?;
         if self.problem.as_ref() != &val.problem {
             Err(StoageError::Mismatch(
                 self.problem.as_ref().clone(),

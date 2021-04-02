@@ -20,8 +20,8 @@ enum Kind<E: 'static + ErrType> {
 }
 #[derive(Debug)]
 pub struct Error<E: 'static + ErrType> {
-    kind: Kind<E>,
     id: SubmitKey,
+    kind: Kind<E>,
 }
 impl<E: 'static + ErrType> fmt::Display for Error<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -77,6 +77,7 @@ impl<'a> Cache<'a> {
                 &self.problem,
                 language,
                 iter.into_iter().enumerate().filter_map(|(index, id)| {
+                    #[allow(clippy::uninit_assumed_init)]
                     ret.push(Handle {
                         id,
                         state: unsafe { MaybeUninit::uninit().assume_init() },

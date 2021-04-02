@@ -105,9 +105,7 @@ impl<'a> Downloader<'a> {
                                 .await
                                 .into_iter()
                                 .try_for_each(|v| {
-                                    decoder.append_message(
-                                        v.map_err(|e| Error::Submit(e))?.output.trim(),
-                                    );
+                                    decoder.append_message(v.map_err(Error::Submit)?.output.trim());
                                     Ok(())
                                 })?;
                             decoder.decode().map_err(|e| Error::Decode(begin + i, e))?

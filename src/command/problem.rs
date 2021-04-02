@@ -17,7 +17,7 @@ use std::{fs::File, io::Write};
 use termcolor::{Color, StandardStream, WriteColor};
 
 #[allow(unused_must_use)]
-async fn get_data<'a>(stdout: &mut StandardStream, downloader: &mut Downloader<'a>) {
+async fn get_data(stdout: &mut StandardStream, downloader: &mut Downloader<'_>) {
     if downloader.is_empty() {
         write_error!(stdout, "Error", "No metadata");
         return;
@@ -52,7 +52,7 @@ async fn get_data<'a>(stdout: &mut StandardStream, downloader: &mut Downloader<'
 }
 
 #[allow(unused_must_use)]
-async fn get_meta<'a>(stdout: &mut StandardStream, downloader: &mut Downloader<'a>) {
+async fn get_meta(stdout: &mut StandardStream, downloader: &mut Downloader<'_>) {
     let cnt = read_usize(stdout, b"Until: ", 0, usize::MAX);
     let template = read_template(stdout);
     write_info!(stdout, "Info", "Loading {} more testcase's metadata", cnt);
@@ -64,10 +64,10 @@ async fn get_meta<'a>(stdout: &mut StandardStream, downloader: &mut Downloader<'
 }
 
 #[allow(unused_must_use)]
-pub async fn problem_loop<'a>(
+pub async fn problem_loop(
     stdout: &mut StandardStream,
     session: &Session,
-    submitter: &'a mut Submitter,
+    submitter: &'_ mut Submitter,
 ) {
     let problem = read_problem(stdout, session).await;
     write_info!(

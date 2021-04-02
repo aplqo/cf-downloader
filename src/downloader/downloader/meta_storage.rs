@@ -48,7 +48,7 @@ struct LoadContent {
 
 impl<'a> Downloader<'a> {
     pub fn load_meta<R: Read>(&mut self, rdr: R) -> Result<(), Error> {
-        let lst: LoadContent = from_reader(rdr).map_err(|e| Error::Yaml(e))?;
+        let lst: LoadContent = from_reader(rdr).map_err(Error::Yaml)?;
         if &lst.problem != self.problem.as_ref() {
             Err(Error::Mismatch(self.problem.as_ref().clone(), lst.problem))
         } else {
@@ -64,6 +64,6 @@ impl<'a> Downloader<'a> {
                 data: &self.data,
             },
         )
-        .map_err(|x| Error::Yaml(x))
+        .map_err(Error::Yaml)
     }
 }

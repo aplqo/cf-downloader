@@ -64,12 +64,12 @@ impl DataDecoder for Decoder {
     }
     fn decode(&mut self) -> Result<String> {
         decode_config_buf(&self.buffer, base64::STANDARD, &mut self.decoded)
-            .map_err(|x| Error::Decode(x))?;
+            .map_err(Error::Decode)?;
         let mut ret = String::new();
         ret.reserve(self.output_size);
         GzDecoder::new(self.decoded.as_slice())
             .read_to_string(&mut ret)
-            .map_err(|x| Error::Decompress(x))?;
+            .map_err(Error::Decompress)?;
         Ok(ret)
     }
 }

@@ -17,7 +17,7 @@ impl<'a> Downloader<'a> {
         Self {
             problem: r.clone(),
             data: Vec::new(),
-            cache: Cache::new(r.clone(), submitter),
+            cache: Cache::new(r, submitter),
         }
     }
     pub fn len(&self) -> usize {

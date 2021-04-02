@@ -84,3 +84,8 @@ impl Email {
         Ok(())
     }
 }
+impl Default for Email {
+    fn default() -> Self {
+        Self::new()
+    }
+}

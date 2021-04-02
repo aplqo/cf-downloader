@@ -137,6 +137,6 @@ impl Session {
         )
         .await
         .map_err(network_error)?
-        .map_or(Ok(()), |x| Err(Error::with_description(Kind::API, x)))
+        .map_or(Ok(()), |x| Err(Error::with_description(Kind::Api, x)))
     }
 }

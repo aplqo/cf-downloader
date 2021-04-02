@@ -21,6 +21,7 @@ impl RegexSet {
                 .unwrap(),
         }
     }
+    #[allow(clippy::ptr_arg)]
     fn find_error(&self, body: &String) -> Option<String> {
         let ret = self
             .error
@@ -36,6 +37,7 @@ impl RegexSet {
             Some(ret)
         }
     }
+    #[allow(clippy::ptr_arg)]
     fn find_name(&self, response: &String) -> Result<String> {
         search_text(response.as_str(), &self.name)
             .ok_or_else(|| Error::with_description(Kind::Regex, "Can't find register name"))
@@ -112,7 +114,7 @@ impl Session {
                 .await
                 .map_err(network_error)?,
             )
-            .map_or(Ok(()), |x| Err(Error::with_description(Kind::API, x)))?;
+            .map_or(Ok(()), |x| Err(Error::with_description(Kind::Api, x)))?;
         for p in email
             .wait_email_urls("noreply@codeforces.com")
             .await
@@ -127,7 +129,7 @@ impl Session {
             }
         }
         Err(Error::with_description(
-            Kind::API,
+            Kind::Api,
             "Can't find configm address",
         ))
     }

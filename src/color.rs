@@ -50,9 +50,3 @@ macro_rules! write_ok {
         write_color!($dest, Color::Green, $typ, $($arg)*);
     };
 }
-
-macro_rules! write_progress {
-    ($dest:expr, $typ:expr, $($arg:tt)*) => {
-        write_color!($dest, Color::Cyan, $typ, $($arg)*);
-    };
-}

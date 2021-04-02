@@ -33,7 +33,7 @@ impl RegexSet {
 }
 
 fn csrf_network_error(error: reqwest::Error) -> Error {
-    Error::with_kind(Kind::CSRF(Box::new(network_error(error))))
+    Error::with_kind(Kind::Csrf(Box::new(network_error(error))))
 }
 
 impl Session {
@@ -65,9 +65,10 @@ impl Session {
         })
     }
 
+    #[allow(clippy::ptr_arg)]
     pub(super) fn find_csrf(&self, response: &String) -> Result<String> {
         search_text(response, &self.regex.session.csrf)
-            .ok_or_else(|| Error::with_kind(Kind::CSRF(Box::new(regex_mismatch(None)))))
+            .ok_or_else(|| Error::with_kind(Kind::Csrf(Box::new(regex_mismatch(None)))))
     }
     pub(super) async fn get_csrf(&self, url: &str) -> Result<String> {
         self.find_csrf(
@@ -113,7 +114,7 @@ impl Session {
             Ok(())
         } else {
             Err(Error::with_description(
-                Kind::API,
+                Kind::Api,
                 "Failed to login to codeforces.com",
             ))
         }
@@ -140,5 +141,11 @@ impl Session {
         .map_err(network_error)?;
         self.online = false;
         Ok(())
+    }
+}
+
+impl Default for Session {
+    fn default() -> Self {
+        Self::new()
     }
 }

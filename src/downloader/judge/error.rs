@@ -7,8 +7,8 @@ use std::{boxed::Box, convert::Into, error::Error as StdError, fmt, result::Resu
 pub(super) enum Kind {
     Builder(reqwest::Error),
     Network(reqwest::Error),
-    CSRF(Box<Error>),
-    API,
+    Csrf(Box<Error>),
+    Api,
     Regex,
     Email(email::Error),
     TestCount(usize, usize),
@@ -26,8 +26,8 @@ impl fmt::Display for Error {
         match &self.kind {
             Kind::Builder(err) => write!(f, "Error building client: {}", err),
             Kind::Network(err) => write!(f, "Error sending request: {}", err),
-            Kind::CSRF(x) => write!(f, "Error getting csrf token: {}", x),
-            Kind::API => {
+            Kind::Csrf(x) => write!(f, "Error getting csrf token: {}", x),
+            Kind::Api => {
                 write!(f, "API request failed")?;
                 self.write_description(f)
             }
@@ -46,9 +46,9 @@ impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match &self.kind {
             Kind::Builder(x) | Kind::Network(x) => Some(x),
-            Kind::CSRF(x) => Some(x.as_ref()),
+            Kind::Csrf(x) => Some(x.as_ref()),
             Kind::Email(e) => Some(e),
-            Kind::API | Kind::Regex | Kind::TestCount(_, _) => None,
+            Kind::Api | Kind::Regex | Kind::TestCount(_, _) => None,
         }
     }
 }

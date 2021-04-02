@@ -67,7 +67,7 @@ impl Submitter {
             )
             .await
             .into_iter()
-            .filter_map(|x| x)
+            .flatten()
             .collect();
         if ret.is_empty() {
             self.session.clear();
