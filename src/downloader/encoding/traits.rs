@@ -5,28 +5,20 @@ use crate::{
     types::{DataId, TestMeta},
 };
 
-pub trait MetaEncoding<'a>: Sized
-where
-    Self::Error: Error,
-{
-    type Error;
-    fn new(template: &Template, max_ignore: usize) -> Result<Self, Self::Error>;
+pub trait MetaEncoding<'a, Err: Error>: Sized {
+    fn new(template: &Template, max_ignore: usize) -> Result<Self, Err>;
     fn init(&mut self);
-    fn ignore(&mut self, hash: &'a DataId);
-    fn generate(&self) -> Result<String, Self::Error>;
-    fn decode(message: Verdict) -> Result<TestMeta, Self::Error>;
+    fn ignore<'b: 'a>(&mut self, hash: &'b DataId);
+    fn generate(&self) -> Result<String, Err>;
+    fn decode(message: Verdict) -> Result<TestMeta, Err>;
 }
 
-pub trait DataEncoder<'a>: Sized
-where
-    Self::Error: Error,
-{
-    type Error;
-    fn new(template: &Template, max_ignore: usize) -> Result<Self, Self::Error>;
+pub trait DataEncoder<'a, Err: Error>: Sized {
+    fn new(template: &Template, max_ignore: usize) -> Result<Self, Err>;
     fn init(&mut self);
-    fn push_ignore(&mut self, hash: &'a DataId);
+    fn push_ignore<'b: 'a>(&mut self, hash: &'b DataId);
     fn pop_ignore(&mut self);
-    fn generate(&self, offset: usize) -> Result<String, Self::Error>;
+    fn generate(&self, offset: usize) -> Result<String, Err>;
 }
 
 pub trait DataDecoder: Sized

@@ -25,9 +25,7 @@ pub struct Encoder<'a> {
     engine: Handlebars<'a>,
 }
 
-impl<'a> traits::DataEncoder<'a> for Encoder<'a> {
-    type Error = Error;
-
+impl<'a> traits::DataEncoder<'a, Error> for Encoder<'a> {
     fn new(template: &Template, max: usize) -> Result<Self> {
         let mut ret = Encoder {
             random: 0,
@@ -43,7 +41,7 @@ impl<'a> traits::DataEncoder<'a> for Encoder<'a> {
     fn init(&mut self) {
         self.random = random_standard();
     }
-    fn push_ignore(&mut self, hash: &'a DataId) {
+    fn push_ignore<'b: 'a>(&mut self, hash: &'b DataId) {
         self.ignore.push(hash);
     }
     fn pop_ignore(&mut self) {

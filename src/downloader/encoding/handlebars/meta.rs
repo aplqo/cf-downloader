@@ -13,12 +13,13 @@ use serde::Serialize;
 use std::str::SplitWhitespace;
 
 #[derive(Serialize)]
-struct MetaParam<'a> {
+struct MetaParam<'a, 'b> {
     random: u64,
-    ignore: Vec<&'a DataId>,
+    ignore: &'b Vec<&'a DataId>,
 }
 pub struct Meta<'a> {
-    param: MetaParam<'a>,
+    random: u64,
+    ignore: Vec<&'a DataId>,
     engine: Handlebars<'a>,
 }
 
@@ -33,15 +34,11 @@ fn next_usize(split: &mut SplitWhitespace, name: &'static str) -> Result<usize> 
         .map_err(|x| Error::ParseInt(name, x))
 }
 
-impl<'a> traits::MetaEncoding<'a> for Meta<'a> {
-    type Error = Error;
-
+impl<'a> traits::MetaEncoding<'a, Error> for Meta<'a> {
     fn new(template: &Template, max: usize) -> Result<Self> {
         let mut ret = Meta {
-            param: MetaParam {
-                random: 0,
-                ignore: Vec::with_capacity(max),
-            },
+            random: 0,
+            ignore: Vec::with_capacity(max),
             engine: Handlebars::new(),
         };
         ret.engine
@@ -50,14 +47,20 @@ impl<'a> traits::MetaEncoding<'a> for Meta<'a> {
         Ok(ret)
     }
     fn init(&mut self) {
-        self.param.random = random_standard();
+        self.random = random_standard();
     }
-    fn ignore(&mut self, hash: &'a DataId) {
-        self.param.ignore.push(hash);
+    fn ignore<'b: 'a>(&mut self, hash: &'b DataId) {
+        self.ignore.push(hash);
     }
     fn generate(&self) -> Result<String> {
         self.engine
-            .render("code", &self.param)
+            .render(
+                "code",
+                &MetaParam {
+                    random: self.random,
+                    ignore: &self.ignore,
+                },
+            )
             .map_err(rander_error)
     }
     fn decode(message: Verdict) -> Result<TestMeta> {
