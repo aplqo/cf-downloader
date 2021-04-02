@@ -8,7 +8,7 @@ pub mod meta_storage;
 pub struct Downloader<'a> {
     problem: Rc<Problem>,
     data: Vec<TestMeta>,
-    cache: Cache<'a>,
+    pub cache: Cache<'a>,
 }
 
 impl<'a> Downloader<'a> {

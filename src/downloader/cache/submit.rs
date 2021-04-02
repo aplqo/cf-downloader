@@ -58,38 +58,7 @@ pub struct Handle<E: 'static + ErrType> {
 }
 
 impl<'a> Cache<'a> {
-    pub async fn submit<Fun, Err>(
-        &'a mut self,
-        id: SubmitKey,
-        language: &str,
-        generate: Fun,
-    ) -> StdResult<&'a Verdict, Error<Err>>
-    where
-        Fun: Fn(SubmitKey) -> StdResult<String, Err>,
-        Err: 'static + ErrType,
-    {
-        if !self.cache.contains_key(&id) {
-            self.cache.insert(
-                id,
-                self.submitter
-                    .submit(
-                        &self.problem,
-                        language,
-                        generate(id)
-                            .map_err(|e| Error::new(id, Kind::Generate(e)))?
-                            .as_str(),
-                    )
-                    .await
-                    .map_err(|e| Error::new(id, Kind::Submit(e)))?
-                    .wait(id.test)
-                    .await
-                    .map_err(|e| Error::new(id, Kind::GetResult(e)))?,
-            );
-        }
-        Ok(self.cache.get(&id).unwrap())
-    }
-
-    pub async fn submit_iter<Fun, Iter, Err>(
+    pub(crate) async fn submit_iter<Fun, Iter, Err>(
         &mut self,
         iter: Iter,
         language: &str,
@@ -139,7 +108,7 @@ impl<'a> Cache<'a> {
             });
         ret
     }
-    pub async fn get_result<Err: ErrType + 'static>(
+    pub(crate) async fn get_result<Err: ErrType + 'static>(
         &'a mut self,
         mut handles: Vec<Handle<Err>>,
     ) -> Vec<StdResult<&'a Verdict, Error<Err>>> {

@@ -1,7 +1,7 @@
 #![feature(async_closure)]
 #![feature(try_blocks)]
 pub mod account;
-mod cache;
+pub mod cache;
 mod config;
 pub mod downloader;
 mod email;
