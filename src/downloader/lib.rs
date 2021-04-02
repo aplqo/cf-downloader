@@ -1,5 +1,6 @@
 #![feature(async_closure)]
 #![feature(try_blocks)]
+#![feature(nll)]
 pub mod account;
 pub mod cache;
 mod config;

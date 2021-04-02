@@ -40,12 +40,15 @@ pub enum DataResult<EG: ErrType, ED: ErrType> {
 }
 
 impl<'a> Downloader<'a> {
-    async fn fetch<Enc: DataEncoder<'a>>(
-        &'a mut self,
+    async fn fetch<'b, 'c, Enc: DataEncoder<'b, Err>, Err: ErrType>(
+        &'c mut self,
         template: &Template,
         begin: usize,
         end: usize,
-    ) -> Result<Vec<Vec<Handle<<Enc as DataEncoder<'a>>::Error>>>, <Enc as DataEncoder<'a>>::Error>
+    ) -> Result<Vec<Vec<Handle<Err>>>, Err>
+    where
+        'a: 'c,
+        'c: 'b,
     {
         let mut encoder = Enc::new(template, end)?;
         for i in &self.data[0..begin] {
@@ -77,12 +80,12 @@ impl<'a> Downloader<'a> {
         .await)
     }
     async fn decode<Dec: DataDecoder, Err: ErrType>(
-        &'a mut self,
+        &mut self,
         begin: usize,
         handles: Vec<Vec<Handle<Err>>>,
     ) -> Vec<Result<String, Error<Err, Dec::Error>>> {
         let mut decoder = Dec::new();
-        let cache: *mut Cache<'a> = &mut self.cache;
+        let cache: *mut Cache<'_> = &mut self.cache;
         let data_ptr = &self.data;
         let decoder_ptr: *mut Dec = &mut decoder;
         join_all(
@@ -116,22 +119,25 @@ impl<'a> Downloader<'a> {
         )
         .await
     }
-    pub async fn get_data<Enc, Dec>(
-        &'a mut self,
+    pub async fn get_data<'c, 'b, Enc, Dec, Err>(
+        &'c mut self,
         template: &Template,
         begin: usize,
         end: usize,
-    ) -> DataResult<<Enc as DataEncoder<'a>>::Error, Dec::Error>
+    ) -> DataResult<Err, Dec::Error>
     where
-        Enc: DataEncoder<'a>,
+        Enc: DataEncoder<'b, Err>,
         Dec: DataDecoder,
+        Err: ErrType,
+        'a: 'c,
+        'c: 'b,
     {
         let self_ptr: *mut Self = self;
         match unsafe { &mut *self_ptr }
-            .fetch::<Enc>(template, begin, end)
+            .fetch::<Enc, Err>(template, begin, end)
             .await
         {
-            Ok(v) => DataResult::Result(self.decode::<Dec, Enc::Error>(begin, v).await),
+            Ok(v) => DataResult::Result(self.decode::<Dec, Err>(begin, v).await),
             Err(e) => DataResult::Build(Error::Build(e)),
         }
     }

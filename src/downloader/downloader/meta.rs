@@ -55,13 +55,14 @@ impl<E: ErrType> Error<E> {
 }
 
 impl<'a> Downloader<'a> {
-    pub async fn get_meta<Enc>(
+    pub async fn get_meta<'b, Enc, Err>(
         &mut self,
         template: &Template,
         end: usize,
-    ) -> Result<(), Error<<Enc as MetaEncoding<'a>>::Error>>
+    ) -> Result<(), Error<Err>>
     where
-        Enc: MetaEncoding<'a> + 'static,
+        Enc: MetaEncoding<'b, Err>,
+        Err: ErrType,
     {
         if end < self.len() {
             return Ok(());
