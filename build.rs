@@ -51,25 +51,35 @@ fn set_long_version(out_dir: &Path, date: &DateTime<Local>, branch: &str, profil
     .unwrap();
     writeln!(
         &mut f,
-        r#"submit_rate:
-    submit_delay: {}s
-    get_submisison_delay: {}s
-    check_delay: {}s"#,
-        submitter::SUBMIT_DELAY.as_secs_f32(),
-        submitter::SUBMISSION_GET_DELAY.as_secs_f32(),
-        submission::CHECK_DELAY.as_secs_f32()
+        r#"retry:
+    delay: {}s
+    delay_after_http403: {}s
+    count: {}"#,
+        retry::RETRY_DELAY.as_secs_f32(),
+        retry::FORBIDDEN_DELAY.as_secs_f32(),
+        retry::RETRY_COUNT
     )
     .unwrap();
     writeln!(
         &mut f,
-        r#"retry:
-    delay: {}s
-    delay_after_http403: {}s
-    count: {}
-    "#,
-        retry::RETRY_DELAY.as_secs_f32(),
-        retry::FORBIDDEN_DELAY.as_secs_f32(),
-        retry::RETRY_COUNT
+        r#"judge:
+    session:
+        verbose: {}
+    submit:
+        check_delay: {}s"#,
+        judge::session::VERBOSE,
+        judge::submit::CHECK_DELAY.as_secs_f32()
+    )
+    .unwrap();
+    writeln!(
+        &mut f,
+        r#"submitter:
+    delay_per_account: {}s
+    submission_get_delay: {}s
+    submit_delay: {}s"#,
+        submitter::DELAY_PER_ACCOUNT.as_secs_f32(),
+        submitter::SUBMISSION_GET_DELAY.as_secs_f32(),
+        submitter::SUBMIT_DELAY.as_secs_f32()
     )
     .unwrap();
 }
