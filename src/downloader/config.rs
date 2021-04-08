@@ -24,9 +24,9 @@ pub mod register {
     use std::time::Duration;
     pub const HANDLE_LEN: usize = 10;
     pub const PASSWORD_LEN: usize = 10;
-    pub const REGISTER_DELAY: Duration = Duration::from_secs(10);
+    pub const REGISTER_DELAY: Duration = Duration::from_secs(5);
 }
 pub mod email {
     use std::time::Duration;
-    pub const CHECK_DELAY: Duration = Duration::from_secs(10);
+    pub const CHECK_DELAY: Duration = Duration::from_secs(5);
 }

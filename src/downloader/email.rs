@@ -5,8 +5,7 @@ extern crate tokio;
 use crate::config::email::CHECK_DELAY;
 use reqwest::Client;
 use serde::Deserialize;
-use std::collections::HashMap;
-use std::vec::Vec;
+use std::{collections::HashMap, vec::Vec};
 use tokio::time::sleep;
 const ADDRESS_URL: &str = "https://10minutemail.net/address.api.php";
 const MAIL_URL: &str = "https://10minutemail.net/mail.api.php";
@@ -25,10 +24,15 @@ struct Response {
     mail_get_mail: String,
     mail_list: Vec<MailEntry>,
 }
-
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Urls {
+    Vector(Vec<String>),
+    Map(HashMap<String, String>),
+}
 #[derive(Deserialize)]
 struct Mail {
-    urls: HashMap<String, String>,
+    urls: Urls,
 }
 pub struct Email {
     client: Client,
@@ -60,19 +64,22 @@ impl Email {
         loop {
             for i in self.get_response().await?.mail_list {
                 if i.from.trim() == from {
-                    return Ok(self
-                        .client
-                        .get(MAIL_URL)
-                        .query(&[("mailid", i.mail_id.as_str())])
-                        .send()
-                        .await?
-                        .error_for_status()?
-                        .json::<Mail>()
-                        .await?
-                        .urls
-                        .into_iter()
-                        .map(|(_, v)| v)
-                        .collect());
+                    return Ok(
+                        match self
+                            .client
+                            .get(MAIL_URL)
+                            .query(&[("mailid", i.mail_id.as_str())])
+                            .send()
+                            .await?
+                            .error_for_status()?
+                            .json::<Mail>()
+                            .await?
+                            .urls
+                        {
+                            Urls::Vector(v) => v,
+                            Urls::Map(m) => m.into_iter().map(|(_, v)| v).collect(),
+                        },
+                    );
                 }
             }
             sleep(CHECK_DELAY).await;

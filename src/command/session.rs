@@ -61,7 +61,7 @@ pub async fn register(stdout: &mut StandardStream) -> Option<Vec<Session>> {
             Some(ses)
         }
         (Some((acc, ses)), Some(e)) => {
-            write_ok!(stdout, "Finished", "Registered {} account", count);
+            write_ok!(stdout, "Finished", "Registered {} account", acc.len());
             write_error!(stdout, "Error", "register: {}", e);
             write_account(stdout, wdr, acc);
             Some(ses)
