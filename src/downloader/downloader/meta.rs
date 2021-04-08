@@ -91,7 +91,7 @@ impl<'a> Downloader<'a> {
                         )
                         .await
                         .map_err(|e| Error::new(id, Kind::Submit(e)))?
-                        .wait(id)
+                        .wait(id+1)
                         .await
                         .map_err(|e| Error::new(id, Kind::GetResult(e)))?,
                 )
